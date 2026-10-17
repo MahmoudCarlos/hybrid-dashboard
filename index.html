@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>لوحة أداء أسطول Hybrid</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PapaParse -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <style>
@@ -18,7 +20,7 @@
 </head>
 <body class="min-h-screen text-slate-800">
 
-    <!-- شاشة تسجيل الدخول -->
+    <!-- شاشة كلمة المرور -->
     <div id="login-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center border border-slate-200">
             <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">🔒</div>
@@ -39,10 +41,10 @@
                 <h1 class="text-2xl font-black text-slate-800 flex items-center gap-2">
                     <span class="text-blue-600">⚡</span> أداء أسطول Hybrid (شروق & عبور)
                 </h1>
-                <p class="text-xs text-gray-500 mt-1">تحديث دوري أسبوعي (من الإثنين إلى الأحد)</p>
+                <p class="text-xs text-gray-500 mt-1">تحديث دوري أسبوعي (دورة العمل: من الإثنين إلى الأحد)</p>
             </div>
             <div class="flex items-center gap-3">
-                <span id="data-status-badge" class="text-xs bg-amber-100 text-amber-800 px-3 py-1.5 rounded-full font-bold">جاري فحص البيانات...</span>
+                <span id="data-status-badge" class="text-xs bg-amber-100 text-amber-800 px-3 py-1.5 rounded-full font-bold">جاري تحميل البيانات...</span>
                 <button onclick="logout()" class="text-xs text-red-500 hover:text-red-700 font-bold border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-lg transition">قفل اللوحة</button>
             </div>
         </header>
@@ -63,15 +65,61 @@
             </div>
         </div>
 
-        <!-- كروت إجماليات المناطق -->
+        <!-- فلاتر العرض: الأسبوع والمارت وطريقة العرض -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
+            <div class="flex flex-wrap items-center gap-3">
+                <!-- فلتر الأسبوع / التاريخ -->
+                <div class="flex items-center gap-1.5">
+                    <label class="text-xs font-bold text-gray-600 whitespace-nowrap">📅 الفترة:</label>
+                    <select id="period-selector" onchange="applyFiltersAndRender()" class="bg-blue-50 border border-blue-200 text-blue-900 font-bold text-xs rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="current_week">🌟 الأسبوع الحالي (من الإثنين حتى الآن)</option>
+                        <option value="prev_week">📅 الأسبوع السابق (الإثنين - الأحد)</option>
+                        <option value="latest_day">🗓️ أحدث يوم مسجل فقط</option>
+                        <option value="all">🌐 كل التواريخ المتاحة</option>
+                    </select>
+                </div>
+
+                <!-- فلتر المارت -->
+                <div class="flex items-center gap-1.5">
+                    <label class="text-xs font-bold text-gray-600 whitespace-nowrap">🏪 المارت:</label>
+                    <select id="mart-selector" onchange="applyFiltersAndRender()" class="bg-slate-50 border border-slate-300 font-bold text-xs rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="all">🌐 كل المارتات معاً</option>
+                        <option value="10223">10223 - شروق منطقة 1</option>
+                        <option value="10187">10187 - شروق منطقة 3</option>
+                        <option value="10233">10233 - شروق الحي 8</option>
+                        <option value="10177">10177 - العبور الرئيسي</option>
+                        <option value="10207">10207 - العبور المنطقة الصناعية</option>
+                        <option value="10260">10260 - عبور جولف</option>
+                    </select>
+                </div>
+
+                <!-- نمط العرض (مجمع أسبوعياً أو يوم بيوم) -->
+                <div class="flex items-center gap-1.5">
+                    <label class="text-xs font-bold text-gray-600 whitespace-nowrap">👁️ العرض:</label>
+                    <select id="view-mode-selector" onchange="applyFiltersAndRender()" class="bg-slate-50 border border-slate-300 font-bold text-xs rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="summary">ملخص مجمّع لكل مندوب</option>
+                        <option value="daily">تفصيلي بكل يوم</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <input type="text" id="search-input" onkeyup="applyFiltersAndRender()" placeholder="بحث برقم المندوب أو المقاول..." class="bg-slate-50 border border-slate-300 text-xs rounded-lg px-3 py-2 w-full md:w-52 outline-none focus:ring-2 focus:ring-blue-500">
+                <div class="text-xs text-gray-500 font-bold whitespace-nowrap bg-slate-100 px-3 py-2 rounded-lg border">
+                    العدد: <span id="riders-count" class="text-blue-600">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- كروت الإجماليات للمناطق الكبرى (تتغير بحسب الأسبوع المختار) -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="bg-gradient-to-l from-blue-600 to-indigo-700 text-white p-5 rounded-2xl shadow-xs">
-                <div class="text-sm font-semibold opacity-90">إجمالي طلبات منطقة الشروق</div>
+                <div class="text-sm font-semibold opacity-90" id="shorouk-card-title">إجمالي طلبات منطقة الشروق (الفترة المحددة)</div>
                 <div class="text-3xl font-black mt-2" id="total-shorouk">0</div>
                 <div class="text-xs opacity-75 mt-1">شروق 1 + شروق 3 + شروق الحي 8</div>
             </div>
             <div class="bg-gradient-to-l from-emerald-600 to-teal-700 text-white p-5 rounded-2xl shadow-xs">
-                <div class="text-sm font-semibold opacity-90">إجمالي طلبات منطقة العبور</div>
+                <div class="text-sm font-semibold opacity-90" id="obour-card-title">إجمالي طلبات منطقة العبور (الفترة المحددة)</div>
                 <div class="text-3xl font-black mt-2" id="total-obour">0</div>
                 <div class="text-xs opacity-75 mt-1">عبور رئيسي + عبور صناعية + عبور جولف</div>
             </div>
@@ -105,28 +153,6 @@
             </div>
         </div>
 
-        <!-- التصفية والبحث -->
-        <div class="bg-white p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
-            <div class="flex items-center gap-2">
-                <label class="text-xs font-bold text-gray-600 whitespace-nowrap">المارت المعروض:</label>
-                <select id="mart-selector" onchange="applyFiltersAndRender()" class="bg-slate-50 border border-slate-300 font-bold text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none w-full md:w-64">
-                    <option value="all">🌐 كل المارتات معاً</option>
-                    <option value="10223">10223 - شروق منطقة 1</option>
-                    <option value="10187">10187 - شروق منطقة 3</option>
-                    <option value="10233">10233 - شروق الحي 8</option>
-                    <option value="10177">10177 - العبور الرئيسي</option>
-                    <option value="10207">10207 - العبور المنطقة الصناعية</option>
-                    <option value="10260">10260 - عبور جولف</option>
-                </select>
-            </div>
-            <div class="flex items-center gap-2">
-                <input type="text" id="search-input" onkeyup="applyFiltersAndRender()" placeholder="بحث برقم المندوب أو المقاول..." class="bg-slate-50 border border-slate-300 text-xs rounded-lg px-3 py-2 w-full md:w-56 outline-none focus:ring-2 focus:ring-blue-500">
-                <div class="text-xs text-gray-500 font-bold whitespace-nowrap bg-slate-100 px-3 py-2 rounded-lg border">
-                    العدد: <span id="riders-count" class="text-blue-600">0</span>
-                </div>
-            </div>
-        </div>
-
         <!-- جدول أداء المناديب -->
         <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
             <div class="overflow-x-auto">
@@ -137,7 +163,7 @@
                             <th onclick="sortTable('contract')" class="p-3">المقاول <span id="icon-contract" class="sort-icon">⇅</span></th>
                             <th onclick="sortTable('martName')" class="p-3">المارت <span id="icon-martName" class="sort-icon">⇅</span></th>
                             <th onclick="sortTable('status')" class="p-3">الحالة <span id="icon-status" class="sort-icon">⇅</span></th>
-                            <th onclick="sortTable('shifts')" class="p-3">أيام العمل <span id="icon-shifts" class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('shifts')" class="p-3">أيام/شفتات العمل <span id="icon-shifts" class="sort-icon">⇅</span></th>
                             <th onclick="sortTable('plannedHours')" class="p-3">ساعات مخططة <span id="icon-plannedHours" class="sort-icon">⇅</span></th>
                             <th onclick="sortTable('actualHours')" class="p-3">ساعات فعلية <span id="icon-actualHours" class="sort-icon">⇅</span></th>
                             <th onclick="sortTable('delays')" class="p-3">التأخير (دقيقة) <span id="icon-delays" class="sort-icon">⇅</span></th>
@@ -156,7 +182,7 @@
 
         <div class="flex items-center gap-2 text-xs text-gray-500">
             <span class="w-3 h-3 bg-red-200 border border-red-400 inline-block rounded"></span>
-            <span>الصفوف المظللة بالأحمر تدل على مناديب غائبين أو سجلوا 0 ساعات عمل فعلية.</span>
+            <span>الصفوف المظللة بالأحمر تدل على مناديب غائبين أو سجلوا 0 ساعات عمل فعلية خلال الفترة المحددة.</span>
         </div>
 
     </div>
@@ -171,7 +197,8 @@
             '10260': { name: 'عبور جولف', zone: 'obour' }
         };
 
-        let parsedRiders = [];
+        let rawParsedRecords = []; // السجلات الخام اليومية
+        let availableDates = [];   // التواريخ المتاحة مرتبة
         let currentSort = { column: 'utr', direction: 'desc' };
 
         function checkPassword() {
@@ -223,12 +250,8 @@
                     if (r.ok) return r.text();
                     throw new Error('Not found');
                 })
-                .then(text => {
-                    parseSmartCSV(text, list[idx]);
-                })
-                .catch(() => {
-                    tryFetchCandidates(list, idx + 1, cb);
-                });
+                .then(text => parseSmartCSV(text, list[idx]))
+                .catch(() => tryFetchCandidates(list, idx + 1, cb));
         }
 
         function handleManualFile(e) {
@@ -241,7 +264,7 @@
             reader.readAsText(file);
         }
 
-        // محرك دمج الهيدر المزدوج الذكي
+        // محرك دمج الهيدر المزدوج
         function parseSmartCSV(csvText, sourceName) {
             const parsed = Papa.parse(csvText.trim(), { header: false, skipEmptyLines: true });
             const rows = parsed.data;
@@ -262,7 +285,6 @@
             let dataRows = [];
 
             if (martCount >= 2 && hasRiderInRow1) {
-                // هيدر سطرين (تصدير Google Drive)
                 for (let i = 0; i < Math.max(row0.length, row1.length); i++) {
                     const m = (row0[i] || '').trim();
                     const metric = (row1[i] || '').trim();
@@ -278,7 +300,6 @@
                 }
                 dataRows = rows.slice(2);
             } else {
-                // هيدر سطر واحد عادي
                 headers = row0.map(c => (c || '').trim());
                 dataRows = rows.slice(1);
             }
@@ -294,7 +315,7 @@
                 formattedObjects.push(obj);
             }
 
-            processFinalData(formattedObjects, sourceName);
+            processRawRows(formattedObjects, sourceName);
         }
 
         function getColValue(row, mart, words) {
@@ -324,11 +345,18 @@
             return '';
         }
 
-        function processFinalData(rows, sourceName) {
-            let shoroukOrders = 0;
-            let obourOrders = 0;
-            let martTotals = { '10223': 0, '10187': 0, '10233': 0, '10177': 0, '10207': 0, '10260': 0 };
-            parsedRiders = [];
+        // تحويل أي تاريخ ليوم الإثنين الخاص بأسبوعه (بداية الأسبوع)
+        function getMondayOfWeek(dateStr) {
+            const d = new Date(dateStr);
+            const day = d.getDay(); // 0 is Sunday, 1 is Monday
+            const diff = (day === 0 ? -6 : 1) - day;
+            d.setDate(d.getDate() + diff);
+            return d.toISOString().split('T')[0];
+        }
+
+        function processRawRows(rows, sourceName) {
+            rawParsedRecords = [];
+            const dateSet = new Set();
 
             rows.forEach(r => {
                 let id = getGeneralValue(r, ['rider id', 'كود', 'id']);
@@ -336,6 +364,8 @@
 
                 let contract = getGeneralValue(r, ['contract', 'اسم']) || 'غير محدد';
                 let dateStr = getGeneralValue(r, ['created', 'تاريخ']);
+                if (dateStr) dateSet.add(dateStr);
+
                 let isNew = dateStr.startsWith('2026-10') || dateStr.startsWith('2026-11') || dateStr.startsWith('2026-09');
 
                 Object.keys(MARTS_CONFIG).forEach(m => {
@@ -349,30 +379,179 @@
                     let utr = getColValue(r, m, ['rider utr', 'utr']);
                     let delays = getColValue(r, m, ['rider delay sum', 'delay']);
 
-                    if (orders > 0) {
-                        martTotals[m] += orders;
-                        if (MARTS_CONFIG[m].zone === 'shorouk') shoroukOrders += orders;
-                        else obourOrders += orders;
-                    }
-
                     if (shifts > 0 || planned > 0 || actual > 0 || orders > 0) {
-                        parsedRiders.push({
+                        rawParsedRecords.push({
                             riderId: id,
                             contract: contract,
                             martCode: m,
                             martName: MARTS_CONFIG[m].name,
                             zone: MARTS_CONFIG[m].zone,
+                            date: dateStr,
+                            monday: dateStr ? getMondayOfWeek(dateStr) : '',
                             shifts: shifts,
-                            plannedHours: Number(planned.toFixed(1)),
-                            actualHours: Number(actual.toFixed(2)),
-                            delays: Number(delays.toFixed(1)),
-                            orders: Math.round(orders),
-                            utr: Number(utr.toFixed(2)),
+                            plannedHours: planned,
+                            actualHours: actual,
+                            delays: delays,
+                            orders: orders,
+                            utr: utr,
                             isNew: isNew,
                             isAbsent: (actual === 0)
                         });
                     }
                 });
+            });
+
+            availableDates = Array.from(dateSet).sort();
+
+            const badge = document.getElementById('data-status-badge');
+            badge.innerText = `تم تحميل البيانات بنجاح (${rawParsedRecords.length} سجل) ✓`;
+            badge.className = 'text-xs bg-emerald-100 text-emerald-800 px-3 py-1.5 rounded-full font-bold';
+
+            document.getElementById('file-info-text').innerText = `المصدر: ${sourceName} — أحدث تاريخ: ${availableDates[availableDates.length - 1] || 'غير محدد'}`;
+
+            applyFiltersAndRender();
+        }
+
+        // الفلترة حسب الأسبوع والمارت والبحث
+        function applyFiltersAndRender() {
+            if (rawParsedRecords.length === 0) return;
+
+            const periodFilter = document.getElementById('period-selector').value;
+            const martFilter = document.getElementById('mart-selector').value;
+            const viewMode = document.getElementById('view-mode-selector').value;
+            const searchTxt = document.getElementById('search-input').value.toLowerCase().trim();
+
+            const latestDate = availableDates[availableDates.length - 1];
+            const currentWeekMonday = latestDate ? getMondayOfWeek(latestDate) : '';
+
+            // حساب الإثنين للأسبوع السابق
+            let prevWeekMonday = '';
+            if (currentWeekMonday) {
+                const prevD = new Date(currentWeekMonday);
+                prevD.setDate(prevD.getDate() - 7);
+                prevWeekMonday = prevD.toISOString().split('T')[0];
+            }
+
+            // 1. فلترة السجلات حسب الفترة المختارة
+            let filteredByPeriod = rawParsedRecords.filter(r => {
+                if (periodFilter === 'current_week') {
+                    return r.monday === currentWeekMonday;
+                } else if (periodFilter === 'prev_week') {
+                    return r.monday === prevWeekMonday;
+                } else if (periodFilter === 'latest_day') {
+                    return r.date === latestDate;
+                }
+                return true; // all
+            });
+
+            // 2. تحديث الكروت العلوية (الإجماليات) بناءً على الفترة المختارة
+            updateSummaryCards(filteredByPeriod);
+
+            // 3. فلترة السجلات حسب المارت والبحث
+            let recordsToDisplay = filteredByPeriod.filter(r => {
+                const matchesMart = (martFilter === 'all') ? true : (r.martCode === martFilter);
+                const matchesSearch = r.riderId.includes(searchTxt) || r.contract.toLowerCase().includes(searchTxt);
+                return matchesMart && matchesSearch;
+            });
+
+            // 4. تجميع أسبوعي أو عرض تفصيلي
+            let finalRows = [];
+            if (viewMode === 'summary') {
+                // تجميع كل مندوب في سطر واحد
+                const map = new Map();
+                recordsToDisplay.forEach(r => {
+                    const key = r.riderId + '_' + r.martCode;
+                    if (!map.has(key)) {
+                        map.set(key, {
+                            riderId: r.riderId,
+                            contract: r.contract,
+                            martCode: r.martCode,
+                            martName: r.martName,
+                            zone: r.zone,
+                            shiftsCount: 0,
+                            totalPlanned: 0,
+                            totalActual: 0,
+                            totalDelays: 0,
+                            totalOrders: 0,
+                            utrList: [],
+                            isNew: r.isNew,
+                            daysWorked: 0,
+                            datesWorked: new Set()
+                        });
+                    }
+                    const item = map.get(key);
+                    if (r.actualHours > 0) item.daysWorked++;
+                    item.shiftsCount += r.shifts;
+                    item.totalPlanned += r.plannedHours;
+                    item.totalActual += r.actualHours;
+                    item.totalDelays += r.delays;
+                    item.totalOrders += r.orders;
+                    if (r.utr > 0) item.utrList.push(r.utr);
+                });
+
+                finalRows = Array.from(map.values()).map(item => {
+                    const avgUtr = (item.totalActual > 0)
+                        ? Number((item.totalOrders / item.totalActual).toFixed(2))
+                        : (item.utrList.length > 0 ? Number((item.utrList.reduce((a, b) => a + b, 0) / item.utrList.length).toFixed(2)) : 0);
+
+                    return {
+                        riderId: item.riderId,
+                        contract: item.contract,
+                        martName: item.martName,
+                        martCode: item.martCode,
+                        isNew: item.isNew,
+                        shifts: item.daysWorked > 0 ? item.daysWorked : Math.round(item.shiftsCount),
+                        plannedHours: Number(item.totalPlanned.toFixed(1)),
+                        actualHours: Number(item.totalActual.toFixed(2)),
+                        delays: Number(item.totalDelays.toFixed(1)),
+                        orders: Math.round(item.totalOrders),
+                        utr: avgUtr,
+                        isAbsent: (item.totalActual === 0)
+                    };
+                });
+            } else {
+                // تفصيلي باليوم
+                finalRows = recordsToDisplay.map(r => ({
+                    riderId: r.riderId,
+                    contract: r.contract + ` (${r.date})`,
+                    martName: r.martName,
+                    martCode: r.martCode,
+                    isNew: r.isNew,
+                    shifts: r.shifts,
+                    plannedHours: Number(r.plannedHours.toFixed(1)),
+                    actualHours: Number(r.actualHours.toFixed(2)),
+                    delays: Number(r.delays.toFixed(1)),
+                    orders: Math.round(r.orders),
+                    utr: Number(r.utr.toFixed(2)),
+                    isAbsent: r.isAbsent
+                }));
+            }
+
+            // 5. الترتيب (الأفضل UTR، ثم أعلى أوردرات، ثم أعلى أيام عمل)
+            finalRows.sort((a, b) => {
+                let va = a[currentSort.column];
+                let vb = b[currentSort.column];
+                if (currentSort.column === 'utr' && va === vb) {
+                    return b.orders - a.orders; // ترتيب ثانوي بالطلبات
+                }
+                return currentSort.direction === 'asc' ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+            });
+
+            document.getElementById('riders-count').innerText = finalRows.length;
+            renderTable(finalRows);
+        }
+
+        function updateSummaryCards(records) {
+            let shoroukOrders = 0;
+            let obourOrders = 0;
+            let martTotals = { '10223': 0, '10187': 0, '10233': 0, '10177': 0, '10207': 0, '10260': 0 };
+
+            records.forEach(r => {
+                if (r.orders > 0) {
+                    martTotals[r.martCode] += r.orders;
+                    if (r.zone === 'shorouk') shoroukOrders += r.orders;
+                    else obourOrders += r.orders;
+                }
             });
 
             document.getElementById('total-shorouk').innerText = Math.round(shoroukOrders).toLocaleString();
@@ -381,40 +560,12 @@
                 const el = document.getElementById('mart-' + m);
                 if (el) el.innerText = Math.round(martTotals[m]).toLocaleString();
             });
-
-            const badge = document.getElementById('data-status-badge');
-            badge.innerText = `تم تحميل البيانات بنجاح (${parsedRiders.length} سجل) ✓`;
-            badge.className = 'text-xs bg-emerald-100 text-emerald-800 px-3 py-1.5 rounded-full font-bold';
-
-            document.getElementById('file-info-text').innerText = `المصدر: ${sourceName} — إجمالي السجلات: ${parsedRiders.length}`;
-
-            applyFiltersAndRender();
-        }
-
-        function applyFiltersAndRender() {
-            const mart = document.getElementById('mart-selector').value;
-            const search = document.getElementById('search-input').value.toLowerCase().trim();
-
-            let filtered = parsedRiders.filter(item => {
-                let mMatch = (mart === 'all') ? true : (item.martCode === mart);
-                let sMatch = item.riderId.includes(search) || item.contract.toLowerCase().includes(search);
-                return mMatch && sMatch;
-            });
-
-            filtered.sort((a, b) => {
-                let va = a[currentSort.column];
-                let vb = b[currentSort.column];
-                return currentSort.direction === 'asc' ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
-            });
-
-            document.getElementById('riders-count').innerText = filtered.length;
-            renderTable(filtered);
         }
 
         function renderTable(data) {
             const tbody = document.getElementById('table-body');
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-gray-400">لا توجد سجلات مطابقة لهذا الاختيار</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-gray-400">لا توجد سجلات مطابقة للفترة أو المارت المحدد</td></tr>`;
                 return;
             }
 
@@ -434,7 +585,7 @@
                         <td class="p-3">${r.contract}</td>
                         <td class="p-3 font-semibold text-slate-500">${r.martName}</td>
                         <td class="p-3">${statusTag}</td>
-                        <td class="p-3 font-bold">${r.shifts}</td>
+                        <td class="p-3 font-bold text-center">${r.shifts}</td>
                         <td class="p-3 text-slate-500">${r.plannedHours} س</td>
                         <td class="p-3">${hoursDisplay}</td>
                         <td class="p-3 ${r.delays > 0 ? 'text-amber-600 font-bold' : 'text-slate-400'}">${r.delays}</td>
