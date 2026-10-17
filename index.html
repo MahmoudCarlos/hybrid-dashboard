@@ -18,7 +18,6 @@
             font-family: 'Cairo', sans-serif;
             background-color: #f3f4f6;
         }
-        /* Custom Scrollbar for table */
         .table-container {
             max-height: 70vh;
             overflow-y: auto;
@@ -34,72 +33,95 @@
         th.sortable:hover {
             background-color: #e2e8f0;
         }
+        /* Drag and drop active state */
+        .drag-active {
+            border-color: #3b82f6 !important;
+            background-color: #eff6ff !important;
+        }
     </style>
 </head>
-<body class="text-gray-800 antialiased p-4 md:p-8">
+<body class="text-gray-800 antialiased p-4 md:p-8 h-screen flex flex-col">
 
-    <div class="max-w-7xl mx-auto space-y-6">
-        
-        <!-- Header & File Upload Section -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div class="flex items-center gap-3">
-                <div class="bg-blue-100 p-3 rounded-lg text-blue-600">
-                    <i class="fa-solid fa-motorcycle text-2xl"></i>
-                </div>
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-800">أداء المناديب اليومي</h1>
-                    <p class="text-sm text-gray-500">تحليل بيانات مناطق الشروق والعبور (Hybrid Fleet)</p>
-                </div>
+    <!-- ================= شاشة تسجيل الدخول ================= -->
+    <div id="login-screen" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center transform transition-all">
+            <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-600 text-3xl">
+                <i class="fa-solid fa-lock"></i>
             </div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">تسجيل الدخول</h2>
+            <p class="text-gray-500 mb-6 text-sm">أدخل كلمة المرور لعرض لوحة التحكم</p>
             
-            <div class="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                <input type="file" id="csvFileInput" accept=".csv" class="block w-full text-sm text-gray-500
-                    file:mr-4 file:py-2.5 file:px-4
-                    file:rounded-lg file:border-0
-                    file:text-sm file:font-semibold
-                    file:bg-blue-50 file:text-blue-700
-                    hover:file:bg-blue-100 transition-all cursor-pointer border border-gray-200 rounded-lg" />
-                <button onclick="processFile()" class="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-colors flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-file-import"></i> رفع وتحليل
+            <input type="password" id="passwordInput" placeholder="كلمة المرور..." 
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4 text-center"
+                onkeypress="if(event.key === 'Enter') checkPassword()">
+            
+            <p id="loginError" class="text-red-500 text-sm mb-4 hidden">كلمة المرور غير صحيحة!</p>
+            
+            <button onclick="checkPassword()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors">
+                دخول
+            </button>
+        </div>
+    </div>
+
+    <!-- ================= محتوى التطبيق الرئيسي (مخفي بالبداية) ================= -->
+    <div id="main-app" class="hidden max-w-7xl mx-auto space-y-6 w-full pb-10">
+        
+        <!-- الهيدر ومنطقة السحب والإفلات -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-6 mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="bg-blue-100 p-3 rounded-lg text-blue-600">
+                        <i class="fa-solid fa-motorcycle text-2xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">أداء المناديب اليومي</h1>
+                        <p class="text-sm text-gray-500">Hybrid Fleet (Shorouk & Obour)</p>
+                    </div>
+                </div>
+                <!-- زر تسجيل الخروج -->
+                <button onclick="logout()" class="text-sm text-red-500 hover:text-red-700 flex items-center gap-1 font-bold">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> قفل اللوحة
                 </button>
+            </div>
+
+            <!-- منطقة رفع الملف -->
+            <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:bg-gray-50 transition-colors" onclick="document.getElementById('csvFileInput').click()">
+                <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="handleFileSelect(event)">
+                <i class="fa-solid fa-cloud-arrow-up text-4xl text-gray-400 mb-3"></i>
+                <h3 class="text-lg font-semibold text-gray-700 mb-1">اسحب ملف <span class="text-blue-600">test new hyb.csv</span> وأفلته هنا</h3>
+                <p class="text-sm text-gray-500">أو اضغط لاختيار الملف من جهازك</p>
             </div>
         </div>
 
-        <!-- Dashboard Content (Hidden until data is loaded) -->
+        <!-- الداشبورد (تظهر بعد رفع البيانات) -->
         <div id="dashboardContent" class="hidden space-y-6">
 
-            <!-- KPIs Header Cards -->
+            <!-- كروت الإجماليات (Shorouk & Obour) -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <!-- Shorouk Zone Total -->
                 <div class="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl shadow p-5 text-white flex items-center justify-between">
                     <div>
-                        <p class="text-indigo-100 text-sm font-semibold mb-1">إجمالي طلبات منطقة الشروق</p>
+                        <p class="text-indigo-100 text-sm font-semibold mb-1">إجمالي طلبات الشروق</p>
                         <h3 class="text-3xl font-bold" id="kpi-shorouk">0</h3>
                     </div>
-                    <div class="text-white/30 text-5xl">
-                        <i class="fa-solid fa-map-location-dot"></i>
-                    </div>
+                    <div class="text-white/30 text-5xl"><i class="fa-solid fa-map-location-dot"></i></div>
                 </div>
-                <!-- Obour Zone Total -->
                 <div class="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl shadow p-5 text-white flex items-center justify-between">
                     <div>
-                        <p class="text-emerald-100 text-sm font-semibold mb-1">إجمالي طلبات منطقة العبور</p>
+                        <p class="text-emerald-100 text-sm font-semibold mb-1">إجمالي طلبات العبور</p>
                         <h3 class="text-3xl font-bold" id="kpi-obour">0</h3>
                     </div>
-                    <div class="text-white/30 text-5xl">
-                        <i class="fa-solid fa-city"></i>
-                    </div>
+                    <div class="text-white/30 text-5xl"><i class="fa-solid fa-city"></i></div>
                 </div>
             </div>
 
-            <!-- Individual Marts KPIs -->
+            <!-- كروت كل مارت -->
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-                    <p class="text-xs text-gray-500 font-bold mb-1">شروق منطقة 1 (10223)</p>
+                    <p class="text-xs text-gray-500 font-bold mb-1">شروق 1 (10223)</p>
                     <p class="text-xl font-bold text-indigo-600" id="kpi-10223">0</p>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-                    <p class="text-xs text-gray-500 font-bold mb-1">شروق منطقة 3 (10187)</p>
+                    <p class="text-xs text-gray-500 font-bold mb-1">شروق 3 (10187)</p>
                     <p class="text-xl font-bold text-indigo-600" id="kpi-10187">0</p>
                 </div>
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
@@ -120,10 +142,10 @@
                 </div>
             </div>
 
-            <!-- Controls (Filter) -->
+            <!-- الفلاتر -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div class="flex items-center gap-2 w-full sm:w-1/3">
-                    <label for="martFilter" class="font-semibold text-gray-700 whitespace-nowrap"><i class="fa-solid fa-filter text-gray-400"></i> تصفية بالمنطقة/المارت:</label>
+                <div class="flex items-center gap-2 w-full sm:w-1/2">
+                    <label for="martFilter" class="font-semibold text-gray-700 whitespace-nowrap"><i class="fa-solid fa-filter text-gray-400"></i> تصفية:</label>
                     <select id="martFilter" onchange="applyFilter()" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
                         <option value="all">الكل (جميع المناطق)</option>
                         <option value="shorouk">منطقة الشروق (كل المارتات)</option>
@@ -137,38 +159,29 @@
                     </select>
                 </div>
                 <div class="text-sm text-gray-500 bg-blue-50 px-4 py-2 rounded-lg">
-                    <i class="fa-solid fa-circle-info text-blue-500"></i> إجمالي المناديب المعروضين: <span id="riderCount" class="font-bold text-blue-700">0</span>
+                    <i class="fa-solid fa-users text-blue-500"></i> عدد المناديب: <span id="riderCount" class="font-bold text-blue-700">0</span>
                 </div>
             </div>
 
-            <!-- Main Data Table -->
+            <!-- جدول البيانات -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="table-container relative">
                     <table class="w-full text-sm text-right text-gray-600">
-                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0 shadow-sm z-10">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0 shadow-sm z-10">
                             <tr>
-                                <th scope="col" class="px-6 py-4 cursor-pointer sortable transition-colors" onclick="handleSort('id')">
-                                    كود المندوب <i class="fa-solid fa-sort text-gray-400 mr-1"></i>
-                                </th>
-                                <th scope="col" class="px-6 py-4 cursor-pointer sortable transition-colors" onclick="handleSort('name')">
-                                    اسم المندوب <i class="fa-solid fa-sort text-gray-400 mr-1"></i>
-                                </th>
-                                <th scope="col" class="px-6 py-4 cursor-pointer sortable transition-colors" onclick="handleSort('status')">
-                                    حالة المندوب <i class="fa-solid fa-sort text-gray-400 mr-1"></i>
-                                </th>
-                                <th scope="col" class="px-6 py-4 cursor-pointer sortable transition-colors" onclick="handleSort('hours')">
-                                    ساعات العمل <i class="fa-solid fa-sort text-gray-400 mr-1"></i>
-                                </th>
-                                <th scope="col" class="px-6 py-4 cursor-pointer sortable transition-colors" onclick="handleSort('orders')">
-                                    عدد الطلبات <i class="fa-solid fa-sort text-gray-400 mr-1"></i>
-                                </th>
-                                <th scope="col" class="px-6 py-4 cursor-pointer sortable transition-colors" onclick="handleSort('utr')">
-                                    UTR <i class="fa-solid fa-sort text-gray-400 mr-1"></i>
-                                </th>
+                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('id')">كود المندوب <i class="fa-solid fa-sort text-gray-400"></i></th>
+                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('name')">الاسم <i class="fa-solid fa-sort text-gray-400"></i></th>
+                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('status')">الحالة <i class="fa-solid fa-sort text-gray-400"></i></th>
+                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('workingDays')">أيام العمل <i class="fa-solid fa-sort text-gray-400"></i></th>
+                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('plannedHours')">ساعات مخططة <i class="fa-solid fa-sort text-gray-400"></i></th>
+                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('actualHours')">ساعات فعلية <i class="fa-solid fa-sort text-gray-400"></i></th>
+                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('delays')">تأخيرات <i class="fa-solid fa-sort text-gray-400"></i></th>
+                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('orders')">الطلبات <i class="fa-solid fa-sort text-gray-400"></i></th>
+                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('utr')">UTR <i class="fa-solid fa-sort text-gray-400"></i></th>
                             </tr>
                         </thead>
                         <tbody id="tableBody">
-                            <!-- Rows will be generated here by JS -->
+                            <!-- Data rows will go here -->
                         </tbody>
                     </table>
                 </div>
@@ -177,281 +190,286 @@
         </div>
     </div>
 
-    <!-- JavaScript Logic -->
+    <!-- JavaScript -->
     <script>
-        // Constants mapping
+        // ================= نظام تسجيل الدخول =================
+        const PASSWORD = 'admin123';
+
+        function checkPassword() {
+            const input = document.getElementById('passwordInput').value;
+            if (input === PASSWORD) {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+                document.getElementById('passwordInput').value = ''; // clear
+            } else {
+                document.getElementById('loginError').classList.remove('hidden');
+            }
+        }
+
+        function logout() {
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('main-app').classList.add('hidden');
+            document.getElementById('loginError').classList.add('hidden');
+        }
+
+        // ================= نظام السحب والإفلات =================
+        const dropZone = document.getElementById('drop-zone');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-active');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-active');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-active');
+            if (e.dataTransfer.files.length) {
+                processFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        function handleFileSelect(e) {
+            if (e.target.files.length) {
+                processFile(e.target.files[0]);
+            }
+        }
+
+        // ================= معالجة البيانات =================
         const MARTS = {
-            '10223': { name: 'شروق منطقة 1', zone: 'shorouk' },
-            '10187': { name: 'شروق منطقة 3', zone: 'shorouk' },
+            '10223': { name: 'شروق 1', zone: 'shorouk' },
+            '10187': { name: 'شروق 3', zone: 'shorouk' },
             '10233': { name: 'شروق حي 8', zone: 'shorouk' },
             '10177': { name: 'عبور', zone: 'obour' },
             '10207': { name: 'عبور صناعية', zone: 'obour' },
             '10260': { name: 'عبور جولف', zone: 'obour' }
         };
 
-        // State variables
-        let globalRidersData = []; 
+        let globalRidersData = [];
         let displayData = [];
         let maxDatasetDate = new Date(0);
         let currentSort = { column: 'orders', direction: 'desc' };
 
-        // Process File Wrapper
-        function processFile() {
-            const fileInput = document.getElementById('csvFileInput');
-            if (!fileInput.files.length) {
-                alert('يرجى اختيار ملف CSV أولاً.');
-                return;
-            }
-
-            const file = fileInput.files[0];
+        function processFile(file) {
+            dropZone.querySelector('h3').innerHTML = `جاري تحليل الملف: <span class="text-blue-600">${file.name}</span>...`;
             
             Papa.parse(file, {
                 header: true,
                 skipEmptyLines: true,
-                dynamicTyping: false,
                 complete: function(results) {
                     try {
                         parseDataset(results.data);
                         document.getElementById('dashboardContent').classList.remove('hidden');
+                        dropZone.querySelector('h3').innerHTML = `<span class="text-green-600">تم رفع البيانات بنجاح!</span>`;
                     } catch (error) {
                         console.error(error);
-                        alert("حدث خطأ أثناء معالجة الملف. تأكد من أن الأعمدة مطابقة للصيغة المطلوبة.");
+                        alert("حدث خطأ. تأكد من أن الأعمدة تحتوي على أسماء المارتات (10177, الخ).");
+                        dropZone.querySelector('h3').innerHTML = `اسحب ملف <span class="text-blue-600">test new hyb.csv</span> وأفلته هنا`;
                     }
-                },
-                error: function(err) {
-                    alert("خطأ في قراءة الملف: " + err.message);
                 }
             });
         }
 
-        // Helper to safely parse dates (DD/MM/YYYY or YYYY-MM-DD)
         function parseDateSafely(dateStr) {
             if (!dateStr) return null;
-            // Clean up time if exists
             let dOnly = dateStr.split(' ')[0];
             let parts = dOnly.split(/[-/]/);
             if (parts.length === 3) {
-                // If format is DD/MM/YYYY
-                if (parseInt(parts[0]) > 12 && parseInt(parts[2]) > 1000) {
-                    return new Date(parts[2], parts[1] - 1, parts[0]);
-                }
-                // If format is YYYY-MM-DD
-                if (parseInt(parts[0]) > 1000) {
-                    return new Date(parts[0], parts[1] - 1, parts[2]);
-                }
+                if (parseInt(parts[0]) > 12 && parseInt(parts[2]) > 1000) return new Date(parts[2], parts[1] - 1, parts[0]);
+                if (parseInt(parts[0]) > 1000) return new Date(parts[0], parts[1] - 1, parts[2]);
             }
             let fallback = new Date(dateStr);
             return isNaN(fallback.getTime()) ? null : fallback;
         }
 
-        // Main Parsing Logic
         function parseDataset(data) {
             let ridersMap = {};
             maxDatasetDate = new Date(0);
             let kpiTotals = { shorouk: 0, obour: 0, marts: {} };
             Object.keys(MARTS).forEach(k => kpiTotals.marts[k] = 0);
 
-            // 1. First pass: find max date
+            // استخراج أقصى تاريخ لمعرفة المندوب الجديد
             data.forEach(row => {
-                let dateKey = Object.keys(row).find(k => k.toLowerCase().includes('created') || k.includes('تاريخ'));
+                let dateKey = Object.keys(row).find(k => k.toLowerCase().includes('date') || k.includes('تاريخ'));
                 if (dateKey && row[dateKey]) {
                     let d = parseDateSafely(row[dateKey]);
                     if (d && d > maxDatasetDate) maxDatasetDate = d;
                 }
             });
 
-            // 2. Second pass: Aggregate data
+            // تجميع البيانات
             data.forEach(row => {
-                // Identify dynamic keys based on common Looker naming
                 let idKey = Object.keys(row).find(k => k.toLowerCase().includes('rider id') || k.includes('كود'));
-                let nameKey = Object.keys(row).find(k => k.toLowerCase().includes('contract name') || k.includes('اسم'));
-                let dateKey = Object.keys(row).find(k => k.toLowerCase().includes('created') || k.includes('تاريخ'));
+                let nameKey = Object.keys(row).find(k => k.toLowerCase().includes('name') || k.includes('اسم'));
+                let dateKey = Object.keys(row).find(k => k.toLowerCase().includes('date') || k.includes('تاريخ'));
                 
                 let id = row[idKey];
-                if (!id) return; // Skip empty rows
+                if (!id) return; 
 
                 let name = row[nameKey] || 'غير معروف';
-                let createdDate = parseDateSafely(row[dateKey]);
+                let rowDate = parseDateSafely(row[dateKey]);
+                let dateString = rowDate ? rowDate.toISOString().split('T')[0] : 'unknown';
 
                 if (!ridersMap[id]) {
                     ridersMap[id] = {
-                        id: id,
-                        name: name,
-                        createdDate: createdDate,
-                        marts: {}
+                        id: id, name: name, createdDate: rowDate,
+                        marts: {}, workedDates: new Set()
                     };
-                    Object.keys(MARTS).forEach(k => ridersMap[id].marts[k] = { orders: 0, hours: 0 });
+                    Object.keys(MARTS).forEach(k => ridersMap[id].marts[k] = { 
+                        orders: 0, actualHours: 0, plannedHours: 0, delays: 0 
+                    });
                 }
 
-                // Extract orders and hours for each mart (Handling pivoted structure: "<mart_code>/Total Orders")
                 Object.keys(MARTS).forEach(martCode => {
-                    // Find column keys for this specific mart
-                    let orderCol = Object.keys(row).find(k => k.includes(martCode) && (k.toLowerCase().includes('completed') || k.toLowerCase().includes('orders') || k.includes('طلبات')));
-                    let hourCol = Object.keys(row).find(k => k.includes(martCode) && (k.toLowerCase().includes('working') || k.toLowerCase().includes('hours') || k.includes('ساعات')));
+                    // البحث الذكي عن الأعمدة بناءً على الكلمات المفتاحية الموجودة في ملف اللوكر
+                    let orderCol = Object.keys(row).find(k => k.includes(martCode) && (k.toLowerCase().includes('completed') || k.toLowerCase().includes('orders')));
+                    let actualHourCol = Object.keys(row).find(k => k.includes(martCode) && (k.toLowerCase().includes('actual') || k.toLowerCase().includes('working') || k.includes('ساعات')));
+                    let plannedHourCol = Object.keys(row).find(k => k.includes(martCode) && (k.toLowerCase().includes('planned') || k.includes('مخطط')));
+                    let delayCol = Object.keys(row).find(k => k.includes(martCode) && (k.toLowerCase().includes('delay') || k.includes('تأخير')));
 
-                    // Fallback for unpivoted structure (if file has 'Mart Code' column instead of pivoted columns)
-                    let rowMartCodeKey = Object.keys(row).find(k => k.toLowerCase().includes('mart code') || k.includes('المارت'));
-                    
-                    let ordersVal = 0;
-                    let hoursVal = 0;
+                    let ordersVal = parseFloat(row[orderCol]) || 0;
+                    let actualHoursVal = parseFloat(row[actualHourCol]) || 0;
+                    let plannedHoursVal = parseFloat(row[plannedHourCol]) || 0;
+                    let delaysVal = parseFloat(row[delayCol]) || 0;
 
-                    if (orderCol && hourCol) {
-                        // Pivoted layout
-                        ordersVal = parseFloat(row[orderCol]) || 0;
-                        hoursVal = parseFloat(row[hourCol]) || 0;
-                    } else if (rowMartCodeKey && String(row[rowMartCodeKey]).includes(martCode)) {
-                        // Unpivoted layout
-                        let genericOrderCol = Object.keys(row).find(k => k.toLowerCase().includes('completed') || k.toLowerCase().includes('orders'));
-                        let genericHourCol = Object.keys(row).find(k => k.toLowerCase().includes('working') || k.toLowerCase().includes('hours'));
-                        ordersVal = parseFloat(row[genericOrderCol]) || 0;
-                        hoursVal = parseFloat(row[genericHourCol]) || 0;
+                    ridersMap[id].marts[martCode].orders += ordersVal;
+                    ridersMap[id].marts[martCode].actualHours += actualHoursVal;
+                    ridersMap[id].marts[martCode].plannedHours += plannedHoursVal;
+                    ridersMap[id].marts[martCode].delays += delaysVal;
+
+                    if (actualHoursVal > 0) {
+                        ridersMap[id].workedDates.add(dateString); // حساب أيام العمل الفعلية
                     }
 
-                    // Add to rider stats
-                    ridersMap[id].marts[martCode].orders += ordersVal;
-                    ridersMap[id].marts[martCode].hours += hoursVal;
-
-                    // Add to global KPIs (only once per exact row/logic)
                     kpiTotals.marts[martCode] += ordersVal;
                     if (MARTS[martCode].zone === 'shorouk') kpiTotals.shorouk += ordersVal;
                     if (MARTS[martCode].zone === 'obour') kpiTotals.obour += ordersVal;
                 });
             });
 
-            // Convert map to array and calculate overall status
             globalRidersData = Object.values(ridersMap).map(rider => {
-                // Check if 'New' (created within last 7 days of max date)
                 let status = 'مستمر';
                 if (rider.createdDate && maxDatasetDate) {
-                    const diffTime = Math.abs(maxDatasetDate - rider.createdDate);
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                    const diffDays = Math.ceil(Math.abs(maxDatasetDate - rider.createdDate) / (1000 * 60 * 60 * 24)); 
                     if (diffDays <= 7) status = 'جديد';
                 }
                 rider.status = status;
                 return rider;
             });
 
-            // Update KPI DOM
             document.getElementById('kpi-shorouk').innerText = Math.round(kpiTotals.shorouk).toLocaleString();
             document.getElementById('kpi-obour').innerText = Math.round(kpiTotals.obour).toLocaleString();
             Object.keys(MARTS).forEach(martCode => {
                 document.getElementById(`kpi-${martCode}`).innerText = Math.round(kpiTotals.marts[martCode]).toLocaleString();
             });
 
-            applyFilter(); // Initial render
+            applyFilter();
         }
 
-        // Apply Filter and Compute Display Data
         function applyFilter() {
             const filterVal = document.getElementById('martFilter').value;
             displayData = [];
 
             globalRidersData.forEach(rider => {
-                let filteredOrders = 0;
-                let filteredHours = 0;
+                let fOrders = 0, fActual = 0, fPlanned = 0, fDelays = 0;
 
                 Object.keys(MARTS).forEach(martCode => {
-                    let shouldInclude = false;
-                    if (filterVal === 'all') shouldInclude = true;
-                    else if (filterVal === 'shorouk' && MARTS[martCode].zone === 'shorouk') shouldInclude = true;
-                    else if (filterVal === 'obour' && MARTS[martCode].zone === 'obour') shouldInclude = true;
-                    else if (filterVal === martCode) shouldInclude = true;
+                    let include = (filterVal === 'all') || 
+                                  (filterVal === 'shorouk' && MARTS[martCode].zone === 'shorouk') ||
+                                  (filterVal === 'obour' && MARTS[martCode].zone === 'obour') ||
+                                  (filterVal === martCode);
 
-                    if (shouldInclude) {
-                        filteredOrders += rider.marts[martCode].orders;
-                        filteredHours += rider.marts[martCode].hours;
+                    if (include) {
+                        fOrders += rider.marts[martCode].orders;
+                        fActual += rider.marts[martCode].actualHours;
+                        fPlanned += rider.marts[martCode].plannedHours;
+                        fDelays += rider.marts[martCode].delays;
                     }
                 });
 
-                // Calculate UTR
-                let utr = filteredHours > 0 ? (filteredOrders / filteredHours) : 0;
-
-                // Only add rider if they have SOME data across the WHOLE dataset (prevents phantom empty rows)
-                // Actually, if we filter by a specific mart, we show them to see if they were absent (0 hours).
-                // But if they have 0 total hours in all dataset, they are dead data.
-                let totalDatasetHours = Object.values(rider.marts).reduce((sum, m) => sum + m.hours, 0);
-                let totalDatasetOrders = Object.values(rider.marts).reduce((sum, m) => sum + m.orders, 0);
+                let totalDatasetActual = Object.values(rider.marts).reduce((s, m) => s + m.actualHours, 0);
+                let totalDatasetOrders = Object.values(rider.marts).reduce((s, m) => s + m.orders, 0);
+                let totalDatasetPlanned = Object.values(rider.marts).reduce((s, m) => s + m.plannedHours, 0);
                 
-                if (totalDatasetHours > 0 || totalDatasetOrders > 0) {
+                // عرض المندوب إذا كان لديه أي بيانات (حتى لو غائب اليوم لمعرفة من الغائب)
+                if (totalDatasetActual > 0 || totalDatasetOrders > 0 || totalDatasetPlanned > 0) {
                     displayData.push({
                         id: rider.id,
                         name: rider.name,
                         status: rider.status,
-                        hours: filteredHours,
-                        orders: filteredOrders,
-                        utr: utr
+                        workingDays: rider.workedDates.size,
+                        plannedHours: fPlanned,
+                        actualHours: fActual,
+                        delays: fDelays,
+                        orders: fOrders,
+                        utr: fActual > 0 ? (fOrders / fActual) : 0
                     });
                 }
             });
 
             document.getElementById('riderCount').innerText = displayData.length;
-            executeSort(); // Re-sort and Render
+            executeSort();
         }
 
-        // Handle Sorting Header Clicks
         function handleSort(column) {
             if (currentSort.column === column) {
                 currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
             } else {
                 currentSort.column = column;
-                currentSort.direction = 'desc'; // Default descending for new column
+                currentSort.direction = 'desc';
             }
             executeSort();
         }
 
-        // Execute Sort and Render Table
         function executeSort() {
             const { column, direction } = currentSort;
-            const modifier = direction === 'asc' ? 1 : -1;
+            const mod = direction === 'asc' ? 1 : -1;
 
             displayData.sort((a, b) => {
-                let valA = a[column];
-                let valB = b[column];
-
-                if (typeof valA === 'string') valA = valA.toLowerCase();
-                if (typeof valB === 'string') valB = valB.toLowerCase();
-
-                if (valA < valB) return -1 * modifier;
-                if (valA > valB) return 1 * modifier;
+                let vA = a[column], vB = b[column];
+                if (typeof vA === 'string') vA = vA.toLowerCase();
+                if (typeof vB === 'string') vB = vB.toLowerCase();
+                if (vA < vB) return -1 * mod;
+                if (vA > vB) return 1 * mod;
                 return 0;
             });
-
             renderTable();
         }
 
-        // Render HTML Table
         function renderTable() {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
 
             displayData.forEach(row => {
                 const tr = document.createElement('tr');
-                const isAbsent = row.hours === 0;
+                
+                // تلوين الصف باللون الأحمر إذا كانت الساعات الفعلية صفر (غياب/بدون شغل)
+                const isAbsent = row.actualHours <= 0 || isNaN(row.actualHours);
 
-                // Apply logic: Red background if absent/0 hours
                 if (isAbsent) {
-                    tr.className = "bg-red-50 hover:bg-red-100 border-b border-red-100 transition-colors";
+                    tr.className = "bg-red-50 hover:bg-red-100 border-b border-red-200 transition-colors";
                 } else {
                     tr.className = "bg-white border-b hover:bg-gray-50 transition-colors";
                 }
 
-                // Status Badge Color
-                let statusBadge = row.status === 'جديد' 
-                    ? '<span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded border border-blue-200">جديد</span>'
-                    : '<span class="bg-gray-100 text-gray-800 text-xs font-semibold px-2.5 py-0.5 rounded border border-gray-200">مستمر</span>';
-
-                // Ensure formatting
-                let hoursFormatted = Number.isInteger(row.hours) ? row.hours : row.hours.toFixed(2);
-                let ordersFormatted = Math.round(row.orders);
-                let utrFormatted = row.utr.toFixed(2);
+                let badge = row.status === 'جديد' 
+                    ? '<span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded border border-blue-200">جديد</span>'
+                    : '<span class="bg-gray-100 text-gray-800 text-xs px-2 py-0.5 rounded border border-gray-200">مستمر</span>';
 
                 tr.innerHTML = `
-                    <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">${row.id}</td>
-                    <td class="px-6 py-4 font-bold text-gray-800">${row.name}</td>
-                    <td class="px-6 py-4">${statusBadge}</td>
-                    <td class="px-6 py-4 font-bold ${isAbsent ? 'text-red-600' : 'text-gray-900'}">${hoursFormatted}</td>
-                    <td class="px-6 py-4 font-bold text-gray-900">${ordersFormatted}</td>
-                    <td class="px-6 py-4 font-bold ${row.utr >= 3 ? 'text-green-600' : 'text-gray-900'}">${utrFormatted}</td>
+                    <td class="px-4 py-3 font-medium">${row.id}</td>
+                    <td class="px-4 py-3 font-bold">${row.name}</td>
+                    <td class="px-4 py-3">${badge}</td>
+                    <td class="px-4 py-3 font-bold">${row.workingDays}</td>
+                    <td class="px-4 py-3">${row.plannedHours.toFixed(2)}</td>
+                    <td class="px-4 py-3 font-bold ${isAbsent ? 'text-red-600' : 'text-green-600'}">${row.actualHours.toFixed(2)}</td>
+                    <td class="px-4 py-3 ${row.delays > 0 ? 'text-orange-500 font-bold' : ''}">${row.delays.toFixed(2)}</td>
+                    <td class="px-4 py-3 font-bold text-gray-900">${Math.round(row.orders)}</td>
+                    <td class="px-4 py-3 font-bold ${row.utr >= 3 ? 'text-green-600' : 'text-gray-900'}">${row.utr.toFixed(2)}</td>
                 `;
                 tbody.appendChild(tr);
             });
