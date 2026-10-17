@@ -15,12 +15,12 @@
         .absent-row:hover { background-color: #fecaca !important; }
         th { cursor: pointer; user-select: none; }
         th:hover { background-color: #e2e8f0; }
-        .sort-icon { display: inline-block; font-size: 11px; margin-right: 4px; }
+        .sort-icon { display: inline-block; font-size: 10px; margin-right: 3px; }
     </style>
 </head>
 <body class="min-h-screen text-slate-800">
 
-    <!-- شاشة كلمة المرور -->
+    <!-- شاشة تسجيل الدخول -->
     <div id="login-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center border border-slate-200">
             <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">🔒</div>
@@ -41,7 +41,7 @@
                 <h1 class="text-2xl font-black text-slate-800 flex items-center gap-2">
                     <span class="text-blue-600">⚡</span> أداء أسطول Hybrid (شروق & عبور)
                 </h1>
-                <p class="text-xs text-gray-500 mt-1">تحديث دوري أسبوعي (دورة العمل: من الإثنين إلى الأحد)</p>
+                <p class="text-xs text-gray-500 mt-1">تحديث دوري أسبوعي (دورة العمل المعتمدة: من الإثنين إلى الأحد)</p>
             </div>
             <div class="flex items-center gap-3">
                 <span id="data-status-badge" class="text-xs bg-amber-100 text-amber-800 px-3 py-1.5 rounded-full font-bold">جاري تحميل البيانات...</span>
@@ -49,7 +49,7 @@
             </div>
         </header>
 
-        <!-- أدوات التحكم والملفات -->
+        <!-- شريط التواريخ النشطة والتحكم بالملفات -->
         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
             <div class="flex items-center gap-2 w-full md:w-auto">
                 <input type="file" id="local-file-input" accept=".csv" class="hidden" onchange="handleManualFile(event)">
@@ -60,22 +60,21 @@
                     🔄 إعادة القراءة من GitHub
                 </button>
             </div>
-            <div class="text-xs text-gray-500 font-medium" id="file-info-text">
-                جاري الفحص التلقائي لملفات المشروع...
+            <!-- وسم تواريخ من وإلى -->
+            <div class="flex items-center gap-2 bg-indigo-50 border border-indigo-200 px-4 py-2 rounded-xl text-indigo-900 font-bold text-xs">
+                <span>🗓️ الفترة الحالية:</span>
+                <span id="active-date-range" class="font-extrabold text-blue-700">جاري الحساب...</span>
             </div>
         </div>
 
         <!-- فلاتر العرض: الأسبوع والمارت وطريقة العرض -->
         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
             <div class="flex flex-wrap items-center gap-3">
-                <!-- فلتر الأسبوع / التاريخ -->
+                <!-- قائمة اختيار الأسبوع مع التواريخ من وإلى -->
                 <div class="flex items-center gap-1.5">
                     <label class="text-xs font-bold text-gray-600 whitespace-nowrap">📅 الفترة:</label>
                     <select id="period-selector" onchange="applyFiltersAndRender()" class="bg-blue-50 border border-blue-200 text-blue-900 font-bold text-xs rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="current_week">🌟 الأسبوع الحالي (من الإثنين حتى الآن)</option>
-                        <option value="prev_week">📅 الأسبوع السابق (الإثنين - الأحد)</option>
-                        <option value="latest_day">🗓️ أحدث يوم مسجل فقط</option>
-                        <option value="all">🌐 كل التواريخ المتاحة</option>
+                        <!-- تُملأ ديناميكياً بأسابيع وتواريخ الملف بدقة -->
                     </select>
                 </div>
 
@@ -93,7 +92,7 @@
                     </select>
                 </div>
 
-                <!-- نمط العرض (مجمع أسبوعياً أو يوم بيوم) -->
+                <!-- نمط العرض -->
                 <div class="flex items-center gap-1.5">
                     <label class="text-xs font-bold text-gray-600 whitespace-nowrap">👁️ العرض:</label>
                     <select id="view-mode-selector" onchange="applyFiltersAndRender()" class="bg-slate-50 border border-slate-300 font-bold text-xs rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
@@ -111,17 +110,27 @@
             </div>
         </div>
 
-        <!-- كروت الإجماليات للمناطق الكبرى (تتغير بحسب الأسبوع المختار) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- كروت الإجماليات والمتوسطات (AVG) للفترة المحددة -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div class="bg-gradient-to-l from-blue-600 to-indigo-700 text-white p-5 rounded-2xl shadow-xs">
-                <div class="text-sm font-semibold opacity-90" id="shorouk-card-title">إجمالي طلبات منطقة الشروق (الفترة المحددة)</div>
+                <div class="text-xs font-semibold opacity-90">إجمالي طلبات الشروق</div>
                 <div class="text-3xl font-black mt-2" id="total-shorouk">0</div>
-                <div class="text-xs opacity-75 mt-1">شروق 1 + شروق 3 + شروق الحي 8</div>
+                <div class="text-[11px] opacity-75 mt-1">شروق 1 + شروق 3 + شروق الحي 8</div>
             </div>
             <div class="bg-gradient-to-l from-emerald-600 to-teal-700 text-white p-5 rounded-2xl shadow-xs">
-                <div class="text-sm font-semibold opacity-90" id="obour-card-title">إجمالي طلبات منطقة العبور (الفترة المحددة)</div>
+                <div class="text-xs font-semibold opacity-90">إجمالي طلبات العبور</div>
                 <div class="text-3xl font-black mt-2" id="total-obour">0</div>
-                <div class="text-xs opacity-75 mt-1">عبور رئيسي + عبور صناعية + عبور جولف</div>
+                <div class="text-[11px] opacity-75 mt-1">عبور رئيسي + عبور صناعية + جولف</div>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                <div class="text-xs font-bold text-gray-500">📊 متوسط ساعات المندوب (AVG)</div>
+                <div class="text-2xl font-black text-amber-600 mt-2" id="kpi-avg-hours">0.0 س</div>
+                <div class="text-[11px] text-gray-400 mt-1">معدل الساعات الفعلية / المندوب</div>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                <div class="text-xs font-bold text-gray-500">📦 متوسط أوردرات المندوب (AVG)</div>
+                <div class="text-2xl font-black text-purple-600 mt-2" id="kpi-avg-orders">0</div>
+                <div class="text-[11px] text-gray-400 mt-1">معدل الطلبات / المندوب</div>
             </div>
         </div>
 
@@ -153,7 +162,7 @@
             </div>
         </div>
 
-        <!-- جدول أداء المناديب -->
+        <!-- جدول أداء المناديب مع أعمدة الـ AVG الجديدة -->
         <div class="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-right text-xs">
@@ -163,17 +172,18 @@
                             <th onclick="sortTable('contract')" class="p-3">المقاول <span id="icon-contract" class="sort-icon">⇅</span></th>
                             <th onclick="sortTable('martName')" class="p-3">المارت <span id="icon-martName" class="sort-icon">⇅</span></th>
                             <th onclick="sortTable('status')" class="p-3">الحالة <span id="icon-status" class="sort-icon">⇅</span></th>
-                            <th onclick="sortTable('shifts')" class="p-3">أيام/شفتات العمل <span id="icon-shifts" class="sort-icon">⇅</span></th>
-                            <th onclick="sortTable('plannedHours')" class="p-3">ساعات مخططة <span id="icon-plannedHours" class="sort-icon">⇅</span></th>
-                            <th onclick="sortTable('actualHours')" class="p-3">ساعات فعلية <span id="icon-actualHours" class="sort-icon">⇅</span></th>
-                            <th onclick="sortTable('delays')" class="p-3">التأخير (دقيقة) <span id="icon-delays" class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('shifts')" class="p-3 text-center">أيام العمل <span id="icon-shifts" class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('actualHours')" class="p-3">إجمالي الساعات <span id="icon-actualHours" class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('avgHoursPerDay')" class="p-3 bg-amber-50 text-amber-900">ساعات/يوم (AVG) <span id="icon-avgHoursPerDay" class="sort-icon">⇅</span></th>
                             <th onclick="sortTable('orders')" class="p-3">إجمالي الطلبات <span id="icon-orders" class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('avgOrdersPerDay')" class="p-3 bg-blue-50 text-blue-900">طلبات/يوم (AVG) <span id="icon-avgOrdersPerDay" class="sort-icon">⇅</span></th>
                             <th onclick="sortTable('utr')" class="p-3">معدل UTR <span id="icon-utr" class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('delays')" class="p-3">تأخير (دقيقة) <span id="icon-delays" class="sort-icon">⇅</span></th>
                         </tr>
                     </thead>
                     <tbody id="table-body" class="divide-y divide-slate-100 font-medium">
                         <tr>
-                            <td colspan="10" class="text-center py-10 text-gray-400">جاري تحميل البيانات...</td>
+                            <td colspan="11" class="text-center py-10 text-gray-400">جاري تحميل البيانات...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -197,8 +207,9 @@
             '10260': { name: 'عبور جولف', zone: 'obour' }
         };
 
-        let rawParsedRecords = []; // السجلات الخام اليومية
-        let availableDates = [];   // التواريخ المتاحة مرتبة
+        let rawParsedRecords = [];
+        let availableDates = [];
+        let weeksMap = {}; // تخزين الأسابيع وتواريخ البداية والنهاية
         let currentSort = { column: 'utr', direction: 'desc' };
 
         function checkPassword() {
@@ -264,7 +275,7 @@
             reader.readAsText(file);
         }
 
-        // محرك دمج الهيدر المزدوج
+        // دمج الهيدر المزدوج
         function parseSmartCSV(csvText, sourceName) {
             const parsed = Papa.parse(csvText.trim(), { header: false, skipEmptyLines: true });
             const rows = parsed.data;
@@ -345,10 +356,10 @@
             return '';
         }
 
-        // تحويل أي تاريخ ليوم الإثنين الخاص بأسبوعه (بداية الأسبوع)
+        // حساب تاريخ الإثنين (بداية الأسبوع) لأي يوم
         function getMondayOfWeek(dateStr) {
             const d = new Date(dateStr);
-            const day = d.getDay(); // 0 is Sunday, 1 is Monday
+            const day = d.getDay(); // 0 Sunday, 1 Monday
             const diff = (day === 0 ? -6 : 1) - day;
             d.setDate(d.getDate() + diff);
             return d.toISOString().split('T')[0];
@@ -402,17 +413,66 @@
             });
 
             availableDates = Array.from(dateSet).sort();
+            buildWeeksList();
 
             const badge = document.getElementById('data-status-badge');
             badge.innerText = `تم تحميل البيانات بنجاح (${rawParsedRecords.length} سجل) ✓`;
             badge.className = 'text-xs bg-emerald-100 text-emerald-800 px-3 py-1.5 rounded-full font-bold';
 
-            document.getElementById('file-info-text').innerText = `المصدر: ${sourceName} — أحدث تاريخ: ${availableDates[availableDates.length - 1] || 'غير محدد'}`;
-
             applyFiltersAndRender();
         }
 
-        // الفلترة حسب الأسبوع والمارت والبحث
+        // بناء قائمة الأسابيع ديناميكياً مع تواريخ من وإلى
+        function buildWeeksList() {
+            weeksMap = {};
+            availableDates.forEach(dStr => {
+                const mon = getMondayOfWeek(dStr);
+                if (!weeksMap[mon]) weeksMap[mon] = [];
+                weeksMap[mon].push(dStr);
+            });
+
+            const sortedMondays = Object.keys(weeksMap).sort().reverse();
+            const select = document.getElementById('period-selector');
+            select.innerHTML = '';
+
+            sortedMondays.forEach((mon, idx) => {
+                const days = weeksMap[mon].sort();
+                const minDay = days[0];
+                const maxDay = days[days.length - 1];
+
+                let label = '';
+                if (idx === 0) {
+                    label = `🌟 الأسبوع الحالي (من ${minDay} إلى ${maxDay})`;
+                } else if (idx === 1) {
+                    label = `📅 الأسبوع السابق (من ${minDay} إلى ${maxDay})`;
+                } else {
+                    label = `🗓️ أسبوع (من ${minDay} إلى ${maxDay})`;
+                }
+
+                const opt = document.createElement('option');
+                opt.value = 'week_' + mon;
+                opt.innerText = label;
+                select.appendChild(opt);
+            });
+
+            // إضافة خيار أحدث يوم
+            if (availableDates.length > 0) {
+                const latest = availableDates[availableDates.length - 1];
+                const optLatest = document.createElement('option');
+                optLatest.value = 'day_' + latest;
+                optLatest.innerText = `🗓️ أحدث يوم مسجل فقط (${latest})`;
+                select.appendChild(optLatest);
+            }
+
+            // إضافة خيار الكل
+            if (availableDates.length > 0) {
+                const optAll = document.createElement('option');
+                optAll.value = 'all';
+                optAll.innerText = `🌐 كل التواريخ المتاحة (من ${availableDates[0]} إلى ${availableDates[availableDates.length - 1]})`;
+                select.appendChild(optAll);
+            }
+        }
+
         function applyFiltersAndRender() {
             if (rawParsedRecords.length === 0) return;
 
@@ -421,43 +481,41 @@
             const viewMode = document.getElementById('view-mode-selector').value;
             const searchTxt = document.getElementById('search-input').value.toLowerCase().trim();
 
-            const latestDate = availableDates[availableDates.length - 1];
-            const currentWeekMonday = latestDate ? getMondayOfWeek(latestDate) : '';
+            let activeDateText = '';
+            let filteredByPeriod = [];
 
-            // حساب الإثنين للأسبوع السابق
-            let prevWeekMonday = '';
-            if (currentWeekMonday) {
-                const prevD = new Date(currentWeekMonday);
-                prevD.setDate(prevD.getDate() - 7);
-                prevWeekMonday = prevD.toISOString().split('T')[0];
+            if (periodFilter.startsWith('week_')) {
+                const targetMonday = periodFilter.replace('week_', '');
+                const days = weeksMap[targetMonday] || [];
+                const minD = days[0] || targetMonday;
+                const maxD = days[days.length - 1] || targetMonday;
+                activeDateText = `من ${minD} إلى ${maxD}`;
+                filteredByPeriod = rawParsedRecords.filter(r => r.monday === targetMonday);
+            } else if (periodFilter.startsWith('day_')) {
+                const targetDay = periodFilter.replace('day_', '');
+                activeDateText = `يوم ${targetDay}`;
+                filteredByPeriod = rawParsedRecords.filter(r => r.date === targetDay);
+            } else {
+                activeDateText = `من ${availableDates[0]} إلى ${availableDates[availableDates.length - 1]}`;
+                filteredByPeriod = rawParsedRecords;
             }
 
-            // 1. فلترة السجلات حسب الفترة المختارة
-            let filteredByPeriod = rawParsedRecords.filter(r => {
-                if (periodFilter === 'current_week') {
-                    return r.monday === currentWeekMonday;
-                } else if (periodFilter === 'prev_week') {
-                    return r.monday === prevWeekMonday;
-                } else if (periodFilter === 'latest_day') {
-                    return r.date === latestDate;
-                }
-                return true; // all
-            });
+            // تحديث وسم الفترة النشطة
+            document.getElementById('active-date-range').innerText = activeDateText;
 
-            // 2. تحديث الكروت العلوية (الإجماليات) بناءً على الفترة المختارة
+            // تحديث الكروت الإجمالية والمتوسطات
             updateSummaryCards(filteredByPeriod);
 
-            // 3. فلترة السجلات حسب المارت والبحث
+            // تصفية حسب المارت والبحث
             let recordsToDisplay = filteredByPeriod.filter(r => {
                 const matchesMart = (martFilter === 'all') ? true : (r.martCode === martFilter);
                 const matchesSearch = r.riderId.includes(searchTxt) || r.contract.toLowerCase().includes(searchTxt);
                 return matchesMart && matchesSearch;
             });
 
-            // 4. تجميع أسبوعي أو عرض تفصيلي
+            // تجميع المندوبين مع حساب متوسطات الساعات والأوردرات
             let finalRows = [];
             if (viewMode === 'summary') {
-                // تجميع كل مندوب في سطر واحد
                 const map = new Map();
                 recordsToDisplay.forEach(r => {
                     const key = r.riderId + '_' + r.martCode;
@@ -473,10 +531,8 @@
                             totalActual: 0,
                             totalDelays: 0,
                             totalOrders: 0,
-                            utrList: [],
                             isNew: r.isNew,
-                            daysWorked: 0,
-                            datesWorked: new Set()
+                            daysWorked: 0
                         });
                     }
                     const item = map.get(key);
@@ -486,13 +542,13 @@
                     item.totalActual += r.actualHours;
                     item.totalDelays += r.delays;
                     item.totalOrders += r.orders;
-                    if (r.utr > 0) item.utrList.push(r.utr);
                 });
 
                 finalRows = Array.from(map.values()).map(item => {
-                    const avgUtr = (item.totalActual > 0)
-                        ? Number((item.totalOrders / item.totalActual).toFixed(2))
-                        : (item.utrList.length > 0 ? Number((item.utrList.reduce((a, b) => a + b, 0) / item.utrList.length).toFixed(2)) : 0);
+                    const days = item.daysWorked > 0 ? item.daysWorked : 1;
+                    const avgHoursPerDay = Number((item.totalActual / days).toFixed(2));
+                    const avgOrdersPerDay = Number((item.totalOrders / days).toFixed(1));
+                    const utr = (item.totalActual > 0) ? Number((item.totalOrders / item.totalActual).toFixed(2)) : 0;
 
                     return {
                         riderId: item.riderId,
@@ -500,39 +556,41 @@
                         martName: item.martName,
                         martCode: item.martCode,
                         isNew: item.isNew,
-                        shifts: item.daysWorked > 0 ? item.daysWorked : Math.round(item.shiftsCount),
-                        plannedHours: Number(item.totalPlanned.toFixed(1)),
+                        shifts: item.daysWorked,
                         actualHours: Number(item.totalActual.toFixed(2)),
-                        delays: Number(item.totalDelays.toFixed(1)),
+                        avgHoursPerDay: avgHoursPerDay,
                         orders: Math.round(item.totalOrders),
-                        utr: avgUtr,
+                        avgOrdersPerDay: avgOrdersPerDay,
+                        delays: Number(item.totalDelays.toFixed(1)),
+                        utr: utr,
                         isAbsent: (item.totalActual === 0)
                     };
                 });
             } else {
-                // تفصيلي باليوم
+                // عرض تفصيلي باليوم
                 finalRows = recordsToDisplay.map(r => ({
                     riderId: r.riderId,
                     contract: r.contract + ` (${r.date})`,
                     martName: r.martName,
                     martCode: r.martCode,
                     isNew: r.isNew,
-                    shifts: r.shifts,
-                    plannedHours: Number(r.plannedHours.toFixed(1)),
+                    shifts: r.actualHours > 0 ? 1 : 0,
                     actualHours: Number(r.actualHours.toFixed(2)),
-                    delays: Number(r.delays.toFixed(1)),
+                    avgHoursPerDay: Number(r.actualHours.toFixed(2)),
                     orders: Math.round(r.orders),
+                    avgOrdersPerDay: Math.round(r.orders),
+                    delays: Number(r.delays.toFixed(1)),
                     utr: Number(r.utr.toFixed(2)),
                     isAbsent: r.isAbsent
                 }));
             }
 
-            // 5. الترتيب (الأفضل UTR، ثم أعلى أوردرات، ثم أعلى أيام عمل)
+            // الترتيب
             finalRows.sort((a, b) => {
                 let va = a[currentSort.column];
                 let vb = b[currentSort.column];
                 if (currentSort.column === 'utr' && va === vb) {
-                    return b.orders - a.orders; // ترتيب ثانوي بالطلبات
+                    return b.orders - a.orders;
                 }
                 return currentSort.direction === 'asc' ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
             });
@@ -546,11 +604,20 @@
             let obourOrders = 0;
             let martTotals = { '10223': 0, '10187': 0, '10233': 0, '10177': 0, '10207': 0, '10260': 0 };
 
+            let totalActualHours = 0;
+            let activeRidersSet = new Set();
+            let totalOrdersAll = 0;
+
             records.forEach(r => {
                 if (r.orders > 0) {
                     martTotals[r.martCode] += r.orders;
+                    totalOrdersAll += r.orders;
                     if (r.zone === 'shorouk') shoroukOrders += r.orders;
                     else obourOrders += r.orders;
+                }
+                if (r.actualHours > 0) {
+                    totalActualHours += r.actualHours;
+                    activeRidersSet.add(r.riderId);
                 }
             });
 
@@ -560,12 +627,20 @@
                 const el = document.getElementById('mart-' + m);
                 if (el) el.innerText = Math.round(martTotals[m]).toLocaleString();
             });
+
+            // حساب متوسطات الـ AVG العلوية
+            const activeRidersCount = activeRidersSet.size || 1;
+            const avgHoursPerRider = (totalActualHours / activeRidersCount).toFixed(1);
+            const avgOrdersPerRider = Math.round(totalOrdersAll / activeRidersCount);
+
+            document.getElementById('kpi-avg-hours').innerText = avgHoursPerRider + ' س';
+            document.getElementById('kpi-avg-orders').innerText = avgOrdersPerRider.toLocaleString();
         }
 
         function renderTable(data) {
             const tbody = document.getElementById('table-body');
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-gray-400">لا توجد سجلات مطابقة للفترة أو المارت المحدد</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="11" class="text-center py-8 text-gray-400">لا توجد سجلات مطابقة للفترة أو المارت المحدد</td></tr>`;
                 return;
             }
 
@@ -586,11 +661,12 @@
                         <td class="p-3 font-semibold text-slate-500">${r.martName}</td>
                         <td class="p-3">${statusTag}</td>
                         <td class="p-3 font-bold text-center">${r.shifts}</td>
-                        <td class="p-3 text-slate-500">${r.plannedHours} س</td>
                         <td class="p-3">${hoursDisplay}</td>
-                        <td class="p-3 ${r.delays > 0 ? 'text-amber-600 font-bold' : 'text-slate-400'}">${r.delays}</td>
+                        <td class="p-3 font-bold text-amber-700 bg-amber-50/50">${r.avgHoursPerDay} س</td>
                         <td class="p-3 font-black text-blue-600">${r.orders}</td>
+                        <td class="p-3 font-bold text-blue-800 bg-blue-50/50">${r.avgOrdersPerDay}</td>
                         <td class="p-3 font-black ${r.utr >= 2 ? 'text-emerald-600' : 'text-slate-700'}">${r.utr}</td>
+                        <td class="p-3 ${r.delays > 0 ? 'text-amber-600 font-bold' : 'text-slate-400'}">${r.delays}</td>
                     </tr>
                 `;
             }).join('');
