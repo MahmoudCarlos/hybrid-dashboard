@@ -3,244 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة تحكم أداء المناديب | Rider Performance</title>
+    <title>لوحة متابعة أداء المناديب - Hybrid Fleet</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- PapaParse for CSV Parsing -->
+    <!-- PapaParse لقراءة ملفات CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <!-- Google Fonts: Cairo -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <!-- FontAwesome for Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
     <style>
-        body {
-            font-family: 'Cairo', sans-serif;
-            background-color: #f3f4f6;
-        }
-        .table-container {
-            max-height: 70vh;
-            overflow-y: auto;
-        }
-        .table-container::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        .table-container::-webkit-scrollbar-thumb {
-            background-color: #cbd5e1;
-            border-radius: 4px;
-        }
-        th.sortable:hover {
-            background-color: #e2e8f0;
-        }
-        /* Drag and drop active state */
-        .drag-active {
-            border-color: #3b82f6 !important;
-            background-color: #eff6ff !important;
-        }
+        body { font-family: 'Cairo', sans-serif; background-color: #f1f5f9; }
+        .sort-icon { display: inline-block; transition: transform 0.2s; font-size: 11px; margin-right: 4px; }
+        th { cursor: pointer; user-select: none; }
+        th:hover { background-color: #e2e8f0; }
+        .absent-row { background-color: #fee2e2 !important; color: #991b1b !important; }
+        .absent-row:hover { background-color: #fecaca !important; }
     </style>
 </head>
-<body class="text-gray-800 antialiased p-4 md:p-8 h-screen flex flex-col">
+<body class="min-h-screen text-slate-800">
 
-    <!-- ================= شاشة تسجيل الدخول ================= -->
-    <div id="login-screen" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300">
-        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center transform transition-all">
-            <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-600 text-3xl">
-                <i class="fa-solid fa-lock"></i>
-            </div>
-            <h2 class="text-2xl font-bold text-gray-800 mb-2">تسجيل الدخول</h2>
-            <p class="text-gray-500 mb-6 text-sm">أدخل كلمة المرور لعرض لوحة التحكم</p>
-            
-            <input type="password" id="passwordInput" placeholder="كلمة المرور..." 
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4 text-center"
-                onkeypress="if(event.key === 'Enter') checkPassword()">
-            
-            <p id="loginError" class="text-red-500 text-sm mb-4 hidden">كلمة المرور غير صحيحة!</p>
-            
-            <button onclick="checkPassword()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors">
-                دخول
-            </button>
+    <!-- شاشة طلب كلمة السر -->
+    <div id="login-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center border border-slate-200">
+            <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">🔒</div>
+            <h2 class="text-xl font-bold mb-2">تسجيل الدخول للداشبورد</h2>
+            <p class="text-xs text-gray-500 mb-6">يرجى إدخال كلمة المرور للوصول للبيانات</p>
+            <input type="password" id="password-input" placeholder="كلمة المرور..." class="w-full px-4 py-2 border rounded-xl mb-3 text-center focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans text-lg">
+            <button onclick="checkPassword()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition shadow-md">دخول</button>
+            <p id="login-error" class="text-red-500 text-xs mt-3 hidden font-semibold">كلمة المرور غير صحيحة!</p>
         </div>
     </div>
 
-    <!-- ================= محتوى التطبيق الرئيسي (مخفي بالبداية) ================= -->
-    <div id="main-app" class="hidden max-w-7xl mx-auto space-y-6 w-full pb-10">
-        
-        <!-- الهيدر ومنطقة السحب والإفلات -->
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <div class="flex flex-col md:flex-row justify-between items-center gap-6 mb-6">
-                <div class="flex items-center gap-3">
-                    <div class="bg-blue-100 p-3 rounded-lg text-blue-600">
-                        <i class="fa-solid fa-motorcycle text-2xl"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-2xl font-bold text-gray-800">أداء المناديب اليومي</h1>
-                        <p class="text-sm text-gray-500">Hybrid Fleet (Shorouk & Obour)</p>
-                    </div>
-                </div>
-                <!-- زر تسجيل الخروج -->
-                <button onclick="logout()" class="text-sm text-red-500 hover:text-red-700 flex items-center gap-1 font-bold">
-                    <i class="fa-solid fa-arrow-right-from-bracket"></i> قفل اللوحة
-                </button>
-            </div>
+    <!-- المحتوى الرئيسي -->
+    <div id="main-content" class="hidden max-w-7xl mx-auto p-4 md:p-6 space-y-6">
 
-            <!-- منطقة رفع الملف -->
-            <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:bg-gray-50 transition-colors" onclick="document.getElementById('csvFileInput').click()">
-                <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="handleFileSelect(event)">
-                <i class="fa-solid fa-cloud-arrow-up text-4xl text-gray-400 mb-3"></i>
-                <h3 class="text-lg font-semibold text-gray-700 mb-1">اسحب ملف <span class="text-blue-600">test new hyb.csv</span> وأفلته هنا</h3>
-                <p class="text-sm text-gray-500">أو اضغط لاختيار الملف من جهازك</p>
+        <!-- الهيدر -->
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-5 rounded-2xl shadow-sm border border-slate-200 gap-4">
+            <div>
+                <h1 class="text-2xl font-extrabold text-slate-800 flex items-center gap-2">
+                    <span class="text-blue-600">⚡</span> أداء المناديب اليومي والأسبوعي
+                </h1>
+                <p class="text-xs text-gray-500 mt-1">Hybrid Fleet (Shorouk & Obour) — دورة العمل: الإثنين إلى الأحد</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="data-status-badge" class="text-xs bg-amber-100 text-amber-800 px-3 py-1.5 rounded-full font-bold">بانتظار رفع الملف</span>
+                <button onclick="logout()" class="text-xs text-red-500 hover:text-red-700 font-bold border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-lg transition">قفل اللوحة</button>
+            </div>
+        </header>
+
+        <!-- منطقة رفع الملف (سحب وإفلات أو اختيار) -->
+        <div id="drop-zone" onclick="document.getElementById('file-input').click()" 
+             class="border-2 border-dashed border-blue-300 hover:border-blue-500 bg-blue-50/40 hover:bg-blue-50/80 p-5 rounded-2xl text-center cursor-pointer transition">
+            <input type="file" id="file-input" accept=".csv" class="hidden" onchange="handleFileSelect(event)">
+            <div class="flex flex-col items-center justify-center space-y-2">
+                <div class="text-3xl">📂</div>
+                <div id="upload-status" class="text-sm font-bold text-blue-900">اضغط هنا لاختيار ملف الـ CSV اليومي أو اسحبه وأفلته هنا</div>
+                <div class="text-xs text-gray-400">الملف يتم تحليله فوراً في متصفحك دون إرساله لأي خادم خارجي</div>
             </div>
         </div>
 
-        <!-- الداشبورد (تظهر بعد رفع البيانات) -->
-        <div id="dashboardContent" class="hidden space-y-6">
-
-            <!-- كروت الإجماليات (Shorouk & Obour) -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl shadow p-5 text-white flex items-center justify-between">
-                    <div>
-                        <p class="text-indigo-100 text-sm font-semibold mb-1">إجمالي طلبات الشروق</p>
-                        <h3 class="text-3xl font-bold" id="kpi-shorouk">0</h3>
-                    </div>
-                    <div class="text-white/30 text-5xl"><i class="fa-solid fa-map-location-dot"></i></div>
-                </div>
-                <div class="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl shadow p-5 text-white flex items-center justify-between">
-                    <div>
-                        <p class="text-emerald-100 text-sm font-semibold mb-1">إجمالي طلبات العبور</p>
-                        <h3 class="text-3xl font-bold" id="kpi-obour">0</h3>
-                    </div>
-                    <div class="text-white/30 text-5xl"><i class="fa-solid fa-city"></i></div>
-                </div>
+        <!-- كروت إجمالي الزونات -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-gradient-to-l from-blue-600 to-indigo-700 text-white p-5 rounded-2xl shadow-sm">
+                <div class="text-sm font-semibold opacity-90">إجمالي طلبات منطقة الشروق</div>
+                <div class="text-3xl font-extrabold mt-2" id="total-shorouk">0</div>
+                <div class="text-xs opacity-75 mt-1">شروق 1 + شروق 3 + شروق الحي 8</div>
             </div>
-
-            <!-- كروت كل مارت -->
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-                    <p class="text-xs text-gray-500 font-bold mb-1">شروق 1 (10223)</p>
-                    <p class="text-xl font-bold text-indigo-600" id="kpi-10223">0</p>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-                    <p class="text-xs text-gray-500 font-bold mb-1">شروق 3 (10187)</p>
-                    <p class="text-xl font-bold text-indigo-600" id="kpi-10187">0</p>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-                    <p class="text-xs text-gray-500 font-bold mb-1">شروق حي 8 (10233)</p>
-                    <p class="text-xl font-bold text-indigo-600" id="kpi-10233">0</p>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-                    <p class="text-xs text-gray-500 font-bold mb-1">عبور (10177)</p>
-                    <p class="text-xl font-bold text-emerald-600" id="kpi-10177">0</p>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-                    <p class="text-xs text-gray-500 font-bold mb-1">عبور صناعية (10207)</p>
-                    <p class="text-xl font-bold text-emerald-600" id="kpi-10207">0</p>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
-                    <p class="text-xs text-gray-500 font-bold mb-1">عبور جولف (10260)</p>
-                    <p class="text-xl font-bold text-emerald-600" id="kpi-10260">0</p>
-                </div>
+            <div class="bg-gradient-to-l from-emerald-600 to-teal-700 text-white p-5 rounded-2xl shadow-sm">
+                <div class="text-sm font-semibold opacity-90">إجمالي طلبات منطقة العبور</div>
+                <div class="text-3xl font-extrabold mt-2" id="total-obour">0</div>
+                <div class="text-xs opacity-75 mt-1">عبور + عبور صناعية + عبور جولف</div>
             </div>
-
-            <!-- الفلاتر -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-                <div class="flex items-center gap-2 w-full sm:w-1/2">
-                    <label for="martFilter" class="font-semibold text-gray-700 whitespace-nowrap"><i class="fa-solid fa-filter text-gray-400"></i> تصفية:</label>
-                    <select id="martFilter" onchange="applyFilter()" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5">
-                        <option value="all">الكل (جميع المناطق)</option>
-                        <option value="shorouk">منطقة الشروق (كل المارتات)</option>
-                        <option value="obour">منطقة العبور (كل المارتات)</option>
-                        <option value="10223">10223 - شروق منطقة 1</option>
-                        <option value="10187">10187 - شروق منطقة 3</option>
-                        <option value="10233">10233 - شروق حي 8</option>
-                        <option value="10177">10177 - عبور</option>
-                        <option value="10207">10207 - عبور صناعية</option>
-                        <option value="10260">10260 - عبور جولف</option>
-                    </select>
-                </div>
-                <div class="text-sm text-gray-500 bg-blue-50 px-4 py-2 rounded-lg">
-                    <i class="fa-solid fa-users text-blue-500"></i> عدد المناديب: <span id="riderCount" class="font-bold text-blue-700">0</span>
-                </div>
-            </div>
-
-            <!-- جدول البيانات -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div class="table-container relative">
-                    <table class="w-full text-sm text-right text-gray-600">
-                        <thead class="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0 shadow-sm z-10">
-                            <tr>
-                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('id')">كود المندوب <i class="fa-solid fa-sort text-gray-400"></i></th>
-                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('name')">الاسم <i class="fa-solid fa-sort text-gray-400"></i></th>
-                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('status')">الحالة <i class="fa-solid fa-sort text-gray-400"></i></th>
-                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('workingDays')">أيام العمل <i class="fa-solid fa-sort text-gray-400"></i></th>
-                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('plannedHours')">ساعات مخططة <i class="fa-solid fa-sort text-gray-400"></i></th>
-                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('actualHours')">ساعات فعلية <i class="fa-solid fa-sort text-gray-400"></i></th>
-                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('delays')">تأخيرات <i class="fa-solid fa-sort text-gray-400"></i></th>
-                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('orders')">الطلبات <i class="fa-solid fa-sort text-gray-400"></i></th>
-                                <th class="px-4 py-4 cursor-pointer sortable" onclick="handleSort('utr')">UTR <i class="fa-solid fa-sort text-gray-400"></i></th>
-                            </tr>
-                        </thead>
-                        <tbody id="tableBody">
-                            <!-- Data rows will go here -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
         </div>
+
+        <!-- كروت إجمالي كل مارت منفصل -->
+        <div class="grid grid-cols-2 md:grid-cols-6 gap-3">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 text-center shadow-xs">
+                <div class="text-xs font-bold text-gray-500">شروق 1 (10223)</div>
+                <div class="text-xl font-black text-blue-600 mt-1" id="mart-10223">0</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 text-center shadow-xs">
+                <div class="text-xs font-bold text-gray-500">شروق 3 (10187)</div>
+                <div class="text-xl font-black text-blue-600 mt-1" id="mart-10187">0</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 text-center shadow-xs">
+                <div class="text-xs font-bold text-gray-500">شروق حي 8 (10233)</div>
+                <div class="text-xl font-black text-blue-600 mt-1" id="mart-10233">0</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 text-center shadow-xs">
+                <div class="text-xs font-bold text-gray-500">عبور (10177)</div>
+                <div class="text-xl font-black text-emerald-600 mt-1" id="mart-10177">0</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 text-center shadow-xs">
+                <div class="text-xs font-bold text-gray-500">عبور صناعية (10207)</div>
+                <div class="text-xl font-black text-emerald-600 mt-1" id="mart-10207">0</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 text-center shadow-xs">
+                <div class="text-xs font-bold text-gray-500">عبور جولف (10260)</div>
+                <div class="text-xl font-black text-emerald-600 mt-1" id="mart-10260">0</div>
+            </div>
+        </div>
+
+        <!-- أدوات التصفية والبحث -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
+            <div class="flex items-center gap-2">
+                <label class="text-xs font-bold text-gray-600 whitespace-nowrap">المارت المعروض:</label>
+                <select id="mart-selector" onchange="applyFiltersAndRender()" class="bg-slate-50 border border-slate-300 font-bold text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none w-full md:w-64">
+                    <option value="all">🌐 كل المارتات معاً</option>
+                    <option value="10223">10223 - شروق منطقة 1</option>
+                    <option value="10187">10187 - شروق منطقة 3</option>
+                    <option value="10233">10233 - شروق الحي 8</option>
+                    <option value="10177">10177 - العبور الرئيسي</option>
+                    <option value="10207">10207 - العبور المنطقة الصناعية</option>
+                    <option value="10260">10260 - عبور جولف</option>
+                </select>
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="text" id="search-input" onkeyup="applyFiltersAndRender()" placeholder="بحث برقم المندوب أو المقاول..." class="bg-slate-50 border border-slate-300 text-xs rounded-lg px-3 py-2 w-full md:w-56 outline-none focus:ring-2 focus:ring-blue-500">
+                <div class="text-xs text-gray-500 font-bold whitespace-nowrap bg-slate-100 px-3 py-2 rounded-lg border">
+                    العدد: <span id="riders-count" class="text-blue-600">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- جدول أداء المناديب -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-right text-xs">
+                    <thead class="bg-slate-100 text-slate-700 border-b font-bold">
+                        <tr>
+                            <th onclick="sortTable('riderId')" class="p-3">كود المندوب <span id="icon-riderId" class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('contract')" class="p-3">المقاول / الاسم <span id="icon-contract" class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('martCode')" class="p-3">المارت <span id="icon-martCode" class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('status')" class="p-3">الحالة <span id="icon-status" class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('shifts')" class="p-3">أيام/شفتات العمل <span id="icon-shifts" class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('plannedHours')" class="p-3">ساعات مخططة <span id="icon-plannedHours" class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('actualHours')" class="p-3">ساعات فعلية <span id="icon-actualHours" class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('delays')" class="p-3">التأخير (دقيقة) <span id="icon-delays" class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('orders')" class="p-3">إجمالي الطلبات <span id="icon-orders" class="sort-icon">⇅</span></th>
+                            <th onclick="sortTable('utr')" class="p-3">معدل UTR <span id="icon-utr" class="sort-icon">⇅</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body" class="divide-y divide-slate-100 font-medium">
+                        <tr>
+                            <td colspan="10" class="text-center py-10 text-gray-400">يرجى رفع ملف الـ CSV لعرض أداء المناديب</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 text-xs text-gray-500">
+            <span class="w-3 h-3 bg-red-200 border border-red-400 inline-block rounded"></span>
+            <span>الصفوف المظللة بالأحمر تدل على مناديب غائبين أو سجلوا 0 ساعات عمل فعلية.</span>
+        </div>
+
     </div>
 
-    <!-- JavaScript -->
     <script>
-        // ================= نظام تسجيل الدخول =================
-        const PASSWORD = 'admin123';
-
-        function checkPassword() {
-            const input = document.getElementById('passwordInput').value;
-            if (input === PASSWORD) {
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('main-app').classList.remove('hidden');
-                document.getElementById('passwordInput').value = ''; // clear
-            } else {
-                document.getElementById('loginError').classList.remove('hidden');
-            }
-        }
-
-        function logout() {
-            document.getElementById('login-screen').classList.remove('hidden');
-            document.getElementById('main-app').classList.add('hidden');
-            document.getElementById('loginError').classList.add('hidden');
-        }
-
-        // ================= نظام السحب والإفلات =================
-        const dropZone = document.getElementById('drop-zone');
-
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('drag-active');
-        });
-
-        dropZone.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('drag-active');
-        });
-
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('drag-active');
-            if (e.dataTransfer.files.length) {
-                processFile(e.dataTransfer.files[0]);
-            }
-        });
-
-        function handleFileSelect(e) {
-            if (e.target.files.length) {
-                processFile(e.target.files[0]);
-            }
-        }
-
-        // ================= معالجة البيانات =================
-        const MARTS = {
+        const MARTS_CONFIG = {
             '10223': { name: 'شروق 1', zone: 'shorouk' },
             '10187': { name: 'شروق 3', zone: 'shorouk' },
             '10233': { name: 'شروق حي 8', zone: 'shorouk' },
@@ -249,230 +168,269 @@
             '10260': { name: 'عبور جولف', zone: 'obour' }
         };
 
-        let globalRidersData = [];
-        let displayData = [];
-        let maxDatasetDate = new Date(0);
-        let currentSort = { column: 'orders', direction: 'desc' };
+        let rawRows = [];
+        let parsedRiders = [];
+        let currentSort = { column: 'utr', direction: 'desc' };
 
-        function processFile(file) {
-            dropZone.querySelector('h3').innerHTML = `جاري تحليل الملف: <span class="text-blue-600">${file.name}</span>...`;
-            
-            Papa.parse(file, {
-                header: true,
-                skipEmptyLines: true,
-                complete: function(results) {
-                    try {
-                        parseDataset(results.data);
-                        document.getElementById('dashboardContent').classList.remove('hidden');
-                        dropZone.querySelector('h3').innerHTML = `<span class="text-green-600">تم رفع البيانات بنجاح!</span>`;
-                    } catch (error) {
-                        console.error(error);
-                        alert("حدث خطأ. تأكد من أن الأعمدة تحتوي على أسماء المارتات (10177, الخ).");
-                        dropZone.querySelector('h3').innerHTML = `اسحب ملف <span class="text-blue-600">test new hyb.csv</span> وأفلته هنا`;
-                    }
-                }
-            });
-        }
-
-        function parseDateSafely(dateStr) {
-            if (!dateStr) return null;
-            let dOnly = dateStr.split(' ')[0];
-            let parts = dOnly.split(/[-/]/);
-            if (parts.length === 3) {
-                if (parseInt(parts[0]) > 12 && parseInt(parts[2]) > 1000) return new Date(parts[2], parts[1] - 1, parts[0]);
-                if (parseInt(parts[0]) > 1000) return new Date(parts[0], parts[1] - 1, parts[2]);
+        // تسجيل الدخول
+        function checkPassword() {
+            const pwd = document.getElementById('password-input').value;
+            if (pwd === 'admin123') {
+                localStorage.setItem('auth_token', 'true');
+                showDashboard();
+            } else {
+                document.getElementById('login-error').classList.remove('hidden');
             }
-            let fallback = new Date(dateStr);
-            return isNaN(fallback.getTime()) ? null : fallback;
         }
 
-        function parseDataset(data) {
-            let ridersMap = {};
-            maxDatasetDate = new Date(0);
-            let kpiTotals = { shorouk: 0, obour: 0, marts: {} };
-            Object.keys(MARTS).forEach(k => kpiTotals.marts[k] = 0);
+        function logout() {
+            localStorage.removeItem('auth_token');
+            location.reload();
+        }
 
-            // استخراج أقصى تاريخ لمعرفة المندوب الجديد
-            data.forEach(row => {
-                let dateKey = Object.keys(row).find(k => k.toLowerCase().includes('date') || k.includes('تاريخ'));
-                if (dateKey && row[dateKey]) {
-                    let d = parseDateSafely(row[dateKey]);
-                    if (d && d > maxDatasetDate) maxDatasetDate = d;
+        function showDashboard() {
+            document.getElementById('login-modal').classList.add('hidden');
+            document.getElementById('main-content').classList.remove('hidden');
+            // محاولة التحميل التلقائي لو الملف موجود في المستودع
+            autoLoadRepoFile();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('auth_token') === 'true') {
+                showDashboard();
+            }
+            setupDragAndDrop();
+        });
+
+        // قراءة مرنة للأعمدة تمنع أي خطأ بسبب المسافات أو الفواصل
+        function findVal(row, martCode, keywords) {
+            for (let key in row) {
+                if (key.includes(martCode)) {
+                    const lowerKey = key.toLowerCase();
+                    const match = keywords.some(kw => lowerKey.includes(kw.toLowerCase()));
+                    if (match) {
+                        let val = row[key];
+                        if (val === undefined || val === null || val === '') return 0;
+                        if (typeof val === 'string') val = val.replace(/,/g, '').trim();
+                        let num = parseFloat(val);
+                        return isNaN(num) ? 0 : num;
+                    }
                 }
-            });
+            }
+            return 0;
+        }
 
-            // تجميع البيانات
-            data.forEach(row => {
-                let idKey = Object.keys(row).find(k => k.toLowerCase().includes('rider id') || k.includes('كود'));
-                let nameKey = Object.keys(row).find(k => k.toLowerCase().includes('name') || k.includes('اسم'));
-                let dateKey = Object.keys(row).find(k => k.toLowerCase().includes('date') || k.includes('تاريخ'));
-                
-                let id = row[idKey];
-                if (!id) return; 
+        function findGeneralVal(row, keywords) {
+            for (let key in row) {
+                const lowerKey = key.toLowerCase();
+                const match = keywords.some(kw => lowerKey.includes(kw.toLowerCase()));
+                if (match) return (row[key] || '').toString().trim();
+            }
+            return '';
+        }
 
-                let name = row[nameKey] || 'غير معروف';
-                let rowDate = parseDateSafely(row[dateKey]);
-                let dateString = rowDate ? rowDate.toISOString().split('T')[0] : 'unknown';
+        function processDataset(data) {
+            rawRows = data;
+            let shoroukOrders = 0;
+            let obourOrders = 0;
+            let martTotals = { '10223': 0, '10187': 0, '10233': 0, '10177': 0, '10207': 0, '10260': 0 };
 
-                if (!ridersMap[id]) {
-                    ridersMap[id] = {
-                        id: id, name: name, createdDate: rowDate,
-                        marts: {}, workedDates: new Set()
-                    };
-                    Object.keys(MARTS).forEach(k => ridersMap[id].marts[k] = { 
-                        orders: 0, actualHours: 0, plannedHours: 0, delays: 0 
-                    });
-                }
+            parsedRiders = [];
 
-                Object.keys(MARTS).forEach(martCode => {
-                    // البحث الذكي عن الأعمدة بناءً على الكلمات المفتاحية الموجودة في ملف اللوكر
-                    let orderCol = Object.keys(row).find(k => k.includes(martCode) && (k.toLowerCase().includes('completed') || k.toLowerCase().includes('orders')));
-                    let actualHourCol = Object.keys(row).find(k => k.includes(martCode) && (k.toLowerCase().includes('actual') || k.toLowerCase().includes('working') || k.includes('ساعات')));
-                    let plannedHourCol = Object.keys(row).find(k => k.includes(martCode) && (k.toLowerCase().includes('planned') || k.includes('مخطط')));
-                    let delayCol = Object.keys(row).find(k => k.includes(martCode) && (k.toLowerCase().includes('delay') || k.includes('تأخير')));
+            // حساب الإجماليات لكل مارت ولكل مندوب
+            rawRows.forEach(row => {
+                const riderId = findGeneralVal(row, ['rider id', 'كود', 'id']);
+                if (!riderId) return;
 
-                    let ordersVal = parseFloat(row[orderCol]) || 0;
-                    let actualHoursVal = parseFloat(row[actualHourCol]) || 0;
-                    let plannedHoursVal = parseFloat(row[plannedHourCol]) || 0;
-                    let delaysVal = parseFloat(row[delayCol]) || 0;
+                const contract = findGeneralVal(row, ['contract', 'name', 'اسم']);
+                const createdDate = findGeneralVal(row, ['created', 'تاريخ']);
+                const isNew = createdDate.startsWith('2026-10') || createdDate.startsWith('2026-11') || createdDate.startsWith('2026-09');
 
-                    ridersMap[id].marts[martCode].orders += ordersVal;
-                    ridersMap[id].marts[martCode].actualHours += actualHoursVal;
-                    ridersMap[id].marts[martCode].plannedHours += plannedHoursVal;
-                    ridersMap[id].marts[martCode].delays += delaysVal;
+                Object.keys(MARTS_CONFIG).forEach(mCode => {
+                    const completedOrders = findVal(row, mCode, ['completed logistics orders', 'completed orders']);
+                    const totalLogisticsOrders = findVal(row, mCode, ['total logistics orders']);
+                    const orders = completedOrders > 0 ? completedOrders : totalLogisticsOrders;
 
-                    if (actualHoursVal > 0) {
-                        ridersMap[id].workedDates.add(dateString); // حساب أيام العمل الفعلية
+                    const shifts = findVal(row, mCode, ['total shifts', 'shifts']);
+                    const plannedHours = findVal(row, mCode, ['planned working duration', 'planned']);
+                    const actualHours = findVal(row, mCode, ['actual working hours', 'actual']);
+                    const utr = findVal(row, mCode, ['rider utr', 'utr']);
+                    const delays = findVal(row, mCode, ['rider delay sum', 'delay']);
+
+                    if (orders > 0) {
+                        martTotals[mCode] += orders;
+                        if (MARTS_CONFIG[mCode].zone === 'shorouk') shoroukOrders += orders;
+                        else obourOrders += orders;
                     }
 
-                    kpiTotals.marts[martCode] += ordersVal;
-                    if (MARTS[martCode].zone === 'shorouk') kpiTotals.shorouk += ordersVal;
-                    if (MARTS[martCode].zone === 'obour') kpiTotals.obour += ordersVal;
-                });
-            });
-
-            globalRidersData = Object.values(ridersMap).map(rider => {
-                let status = 'مستمر';
-                if (rider.createdDate && maxDatasetDate) {
-                    const diffDays = Math.ceil(Math.abs(maxDatasetDate - rider.createdDate) / (1000 * 60 * 60 * 24)); 
-                    if (diffDays <= 7) status = 'جديد';
-                }
-                rider.status = status;
-                return rider;
-            });
-
-            document.getElementById('kpi-shorouk').innerText = Math.round(kpiTotals.shorouk).toLocaleString();
-            document.getElementById('kpi-obour').innerText = Math.round(kpiTotals.obour).toLocaleString();
-            Object.keys(MARTS).forEach(martCode => {
-                document.getElementById(`kpi-${martCode}`).innerText = Math.round(kpiTotals.marts[martCode]).toLocaleString();
-            });
-
-            applyFilter();
-        }
-
-        function applyFilter() {
-            const filterVal = document.getElementById('martFilter').value;
-            displayData = [];
-
-            globalRidersData.forEach(rider => {
-                let fOrders = 0, fActual = 0, fPlanned = 0, fDelays = 0;
-
-                Object.keys(MARTS).forEach(martCode => {
-                    let include = (filterVal === 'all') || 
-                                  (filterVal === 'shorouk' && MARTS[martCode].zone === 'shorouk') ||
-                                  (filterVal === 'obour' && MARTS[martCode].zone === 'obour') ||
-                                  (filterVal === martCode);
-
-                    if (include) {
-                        fOrders += rider.marts[martCode].orders;
-                        fActual += rider.marts[martCode].actualHours;
-                        fPlanned += rider.marts[martCode].plannedHours;
-                        fDelays += rider.marts[martCode].delays;
+                    // إذا كان للمندوب أي نشاط أو شفت أو تسجيل في هذا المارت
+                    if (shifts > 0 || plannedHours > 0 || actualHours > 0 || orders > 0) {
+                        parsedRiders.push({
+                            riderId,
+                            contract: contract || 'غير محدد',
+                            martCode: mCode,
+                            martName: MARTS_CONFIG[mCode].name,
+                            zone: MARTS_CONFIG[mCode].zone,
+                            shifts,
+                            plannedHours: Number(plannedHours.toFixed(1)),
+                            actualHours: Number(actualHours.toFixed(2)),
+                            delays: Number(delays.toFixed(1)),
+                            orders: Math.round(orders),
+                            utr: Number(utr.toFixed(2)),
+                            isNew: isNew,
+                            isAbsent: (actualHours === 0)
+                        });
                     }
                 });
-
-                let totalDatasetActual = Object.values(rider.marts).reduce((s, m) => s + m.actualHours, 0);
-                let totalDatasetOrders = Object.values(rider.marts).reduce((s, m) => s + m.orders, 0);
-                let totalDatasetPlanned = Object.values(rider.marts).reduce((s, m) => s + m.plannedHours, 0);
-                
-                // عرض المندوب إذا كان لديه أي بيانات (حتى لو غائب اليوم لمعرفة من الغائب)
-                if (totalDatasetActual > 0 || totalDatasetOrders > 0 || totalDatasetPlanned > 0) {
-                    displayData.push({
-                        id: rider.id,
-                        name: rider.name,
-                        status: rider.status,
-                        workingDays: rider.workedDates.size,
-                        plannedHours: fPlanned,
-                        actualHours: fActual,
-                        delays: fDelays,
-                        orders: fOrders,
-                        utr: fActual > 0 ? (fOrders / fActual) : 0
-                    });
-                }
             });
 
-            document.getElementById('riderCount').innerText = displayData.length;
-            executeSort();
+            // تحديث البطاقات
+            document.getElementById('total-shorouk').innerText = shoroukOrders.toLocaleString();
+            document.getElementById('total-obour').innerText = obourOrders.toLocaleString();
+            Object.keys(martTotals).forEach(m => {
+                const el = document.getElementById('mart-' + m);
+                if (el) el.innerText = Math.round(martTotals[m]).toLocaleString();
+            });
+
+            document.getElementById('data-status-badge').innerText = `تم تحميل ${rawRows.length} صف بنجاح ✓`;
+            document.getElementById('data-status-badge').className = 'text-xs bg-emerald-100 text-emerald-800 px-3 py-1.5 rounded-full font-bold';
+
+            applyFiltersAndRender();
         }
 
-        function handleSort(column) {
+        function applyFiltersAndRender() {
+            const martFilter = document.getElementById('mart-selector').value;
+            const searchTxt = document.getElementById('search-input').value.toLowerCase().trim();
+
+            let filtered = parsedRiders.filter(item => {
+                const matchesMart = (martFilter === 'all') ? true : (item.martCode === martFilter);
+                const matchesSearch = (item.riderId.toLowerCase().includes(searchTxt) || item.contract.toLowerCase().includes(searchTxt));
+                return matchesMart && matchesSearch;
+            });
+
+            // ترتيب البيانات الافتراضي: أفضل UTR وأعلى طلبات
+            filtered.sort((a, b) => {
+                let valA = a[currentSort.column];
+                let valB = b[currentSort.column];
+                if (currentSort.direction === 'asc') return valA > valB ? 1 : -1;
+                return valA < valB ? 1 : -1;
+            });
+
+            document.getElementById('riders-count').innerText = filtered.length;
+            renderTableRows(filtered);
+        }
+
+        function renderTableRows(data) {
+            const tbody = document.getElementById('table-body');
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-gray-400">لا توجد سجلات مطابقة للبحث أو المارت المحدد</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = data.map(r => {
+                const rowClass = r.isAbsent ? 'absent-row font-semibold' : 'hover:bg-slate-50';
+                const statusTag = r.isNew 
+                    ? `<span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold">كود جديد</span>`
+                    : `<span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-[10px]">مستمر</span>`;
+
+                const hoursDisplay = r.isAbsent 
+                    ? `<span class="text-red-600 font-bold">0.0 (غائب)</span>` 
+                    : `${r.actualHours} س`;
+
+                return `
+                    <tr class="${rowClass} transition border-b border-slate-100">
+                        <td class="p-3 font-mono font-bold">${r.riderId}</td>
+                        <td class="p-3">${r.contract}</td>
+                        <td class="p-3 font-semibold text-slate-500">${r.martName}</td>
+                        <td class="p-3">${statusTag}</td>
+                        <td class="p-3 font-bold">${r.shifts}</td>
+                        <td class="p-3 text-gray-500">${r.plannedHours} س</td>
+                        <td class="p-3">${hoursDisplay}</td>
+                        <td class="p-3 ${r.delays > 0 ? 'text-amber-600 font-bold' : 'text-gray-400'}">${r.delays}</td>
+                        <td class="p-3 font-extrabold text-blue-600">${r.orders}</td>
+                        <td class="p-3 font-black ${r.utr >= 2 ? 'text-emerald-600' : 'text-slate-700'}">${r.utr}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function sortTable(column) {
             if (currentSort.column === column) {
-                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                currentSort.direction = (currentSort.direction === 'desc') ? 'asc' : 'desc';
             } else {
                 currentSort.column = column;
                 currentSort.direction = 'desc';
             }
-            executeSort();
+            applyFiltersAndRender();
         }
 
-        function executeSort() {
-            const { column, direction } = currentSort;
-            const mod = direction === 'asc' ? 1 : -1;
-
-            displayData.sort((a, b) => {
-                let vA = a[column], vB = b[column];
-                if (typeof vA === 'string') vA = vA.toLowerCase();
-                if (typeof vB === 'string') vB = vB.toLowerCase();
-                if (vA < vB) return -1 * mod;
-                if (vA > vB) return 1 * mod;
-                return 0;
-            });
-            renderTable();
+        // قراءة الملف عبر السحب أو الاختيار
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) parseCSV(file);
         }
 
-        function renderTable() {
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = '';
-
-            displayData.forEach(row => {
-                const tr = document.createElement('tr');
-                
-                // تلوين الصف باللون الأحمر إذا كانت الساعات الفعلية صفر (غياب/بدون شغل)
-                const isAbsent = row.actualHours <= 0 || isNaN(row.actualHours);
-
-                if (isAbsent) {
-                    tr.className = "bg-red-50 hover:bg-red-100 border-b border-red-200 transition-colors";
-                } else {
-                    tr.className = "bg-white border-b hover:bg-gray-50 transition-colors";
+        function parseCSV(fileOrText) {
+            document.getElementById('upload-status').innerText = 'جاري تحليل وقراءة الملف...';
+            Papa.parse(fileOrText, {
+                header: true,
+                dynamicTyping: false,
+                skipEmptyLines: true,
+                transformHeader: h => h.trim(),
+                complete: function(results) {
+                    if (results.data && results.data.length > 0) {
+                        processDataset(results.data);
+                        document.getElementById('upload-status').innerText = `تم تحديث البيانات بنجاح من الملف! (${results.data.length} مندوب)`;
+                    } else {
+                        alert('الملف المرفوع فارغ أو تنسيقه غير صحيح.');
+                    }
+                },
+                error: function(err) {
+                    alert('حدث خطأ أثناء قراءة الملف: ' + err.message);
                 }
-
-                let badge = row.status === 'جديد' 
-                    ? '<span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded border border-blue-200">جديد</span>'
-                    : '<span class="bg-gray-100 text-gray-800 text-xs px-2 py-0.5 rounded border border-gray-200">مستمر</span>';
-
-                tr.innerHTML = `
-                    <td class="px-4 py-3 font-medium">${row.id}</td>
-                    <td class="px-4 py-3 font-bold">${row.name}</td>
-                    <td class="px-4 py-3">${badge}</td>
-                    <td class="px-4 py-3 font-bold">${row.workingDays}</td>
-                    <td class="px-4 py-3">${row.plannedHours.toFixed(2)}</td>
-                    <td class="px-4 py-3 font-bold ${isAbsent ? 'text-red-600' : 'text-green-600'}">${row.actualHours.toFixed(2)}</td>
-                    <td class="px-4 py-3 ${row.delays > 0 ? 'text-orange-500 font-bold' : ''}">${row.delays.toFixed(2)}</td>
-                    <td class="px-4 py-3 font-bold text-gray-900">${Math.round(row.orders)}</td>
-                    <td class="px-4 py-3 font-bold ${row.utr >= 3 ? 'text-green-600' : 'text-gray-900'}">${row.utr.toFixed(2)}</td>
-                `;
-                tbody.appendChild(tr);
             });
+        }
+
+        function setupDragAndDrop() {
+            const dropZone = document.getElementById('drop-zone');
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('border-blue-600', 'bg-blue-100/50');
+                }, false);
+            });
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('border-blue-600', 'bg-blue-100/50');
+                }, false);
+            });
+            dropZone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const file = dt.files[0];
+                if (file) parseCSV(file);
+            }, false);
+        }
+
+        // قراءة تلقائية إذا كان الملف مرفوعاً باسم test new hyb.csv أو test_new_hyb.csv
+        function autoLoadRepoFile() {
+            const candidateUrls = ['test%20new%20hyb.csv', 'test_new_hyb.csv', 'test new hyb.csv'];
+            tryFetch(candidateUrls, 0);
+        }
+
+        function tryFetch(urls, index) {
+            if (index >= urls.length) return;
+            fetch(urls[index])
+                .then(res => {
+                    if (res.ok) return res.text();
+                    throw new Error('Not found');
+                })
+                .then(text => {
+                    parseCSV(text);
+                })
+                .catch(() => {
+                    tryFetch(urls, index + 1);
+                });
         }
     </script>
 </body>
