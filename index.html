@@ -70,6 +70,34 @@ td.dl{color:var(--amb);font-weight:700}
 .empty{padding:28px;text-align:center;color:var(--mut)}
 .legend{font-size:12px;color:var(--mut)}
 .legend::before{content:"";display:inline-block;width:12px;height:12px;background:var(--bad);border:1px solid #fca5a5;border-radius:3px;margin-left:6px;vertical-align:-2px}
+.stack{display:grid;gap:12px}
+tr[data-id]{cursor:pointer}
+tr[data-id]:active td{filter:brightness(.96)}
+.dl2{display:block;font-size:12px;font-weight:700;margin-top:1px}
+.up{color:#15803d}.down{color:#b91c1c}.flat{color:var(--mut)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.card h3{margin:0 0 8px;font-size:14px;font-weight:800}
+.note{font-size:12px;color:var(--mut);margin:0}
+.chart{display:flex;align-items:flex-end;gap:6px;height:110px}
+.bc{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:0}
+.bv{font-size:11px;font-weight:700;color:var(--mut);height:16px}
+.bb{width:100%;border-radius:4px 4px 0 0;background:var(--pri)}
+.bb.ab{background:var(--badtx)}.bb.nd{background:var(--line)}
+.pair{display:flex;align-items:flex-end;gap:2px;width:100%;flex:1}
+.pair i{flex:1;border-radius:3px 3px 0 0;display:block}
+.bl{font-size:11px;color:var(--mut);margin-top:4px}
+.lg{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-top:8px}
+.lg b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-left:5px;vertical-align:-1px}
+.mv{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-top:1px solid #eef0ec;font-size:14px;cursor:pointer}
+.mv small{color:var(--mut);font-size:12px}
+.sheet{position:fixed;inset:0;z-index:40;background:var(--bg);overflow-y:auto;padding:0 12px calc(env(safe-area-inset-bottom) + 20px)}
+.sbar{position:sticky;top:0;background:var(--bg);padding:calc(env(safe-area-inset-top) + 10px) 0 6px;display:flex;align-items:center;gap:10px;z-index:2}
+.sbar b{font-size:18px;display:block}
+.sbar small{color:var(--mut);font-size:12px;font-weight:600}
+.dt{width:100%;border-collapse:collapse;font-size:13px}
+.dt td,.dt th{padding:10px 6px;text-align:right;background:transparent;position:static;border-bottom:1px solid #eef0ec;cursor:default;font-size:13px;font-weight:600}
+.dt th{color:var(--mut);font-size:12px;background:transparent}
+.dt tr.absent td{background:var(--bad);color:var(--badtx)}
 </style>
 </head>
 <body>
@@ -104,6 +132,7 @@ td.dl{color:var(--amb);font-weight:700}
 
   <main>
     <div id="msg" class="msg hidden"></div>
+    <div id="listview" class="stack">
     <div class="kpis">
       <div class="kpi"><span>طلبات الشروق</span><b id="k-shorouk">0</b></div>
       <div class="kpi"><span>طلبات العبور</span><b id="k-obour">0</b></div>
@@ -122,8 +151,19 @@ td.dl{color:var(--amb);font-weight:700}
     <div class="count" id="count"></div>
 
     <div class="tw"><table><thead><tr id="thead"></tr></thead><tbody id="tb"></tbody></table></div>
-    <div class="legend">صف أحمر = مندوب غائب (0 ساعات فعلية)</div>
+    <div class="legend">صف أحمر = مندوب غائب (0 ساعات فعلية). اضغط على أي صف لفتح تفاصيل المندوب.</div>
+    </div>
+    <div id="cmp" class="stack hidden"></div>
   </main>
+</div>
+
+<div id="rider" class="sheet hidden">
+  <div class="sbar">
+    <button class="ib" aria-label="رجوع" onclick="closeRider()">→</button>
+    <div><b id="r-id"></b><small id="r-sub"></small></div>
+  </div>
+  <div class="row" id="r-weeks"></div>
+  <div class="stack" id="r-body" style="margin-top:6px"></div>
 </div>
 
 <script>
@@ -232,6 +272,8 @@ function mondayOf(ds){
   dt.setUTCDate(dt.getUTCDate()+(day===0?-6:1)-day);
   return dt.toISOString().slice(0,10);
 }
+function dowOf(ds){const [y,m,d]=ds.split('-').map(Number);return (new Date(Date.UTC(y,m-1,d)).getUTCDay()+6)%7;}
+function addDays(ds,i){const [y,m,d]=ds.split('-').map(Number);return new Date(Date.UTC(y,m-1,d+i)).toISOString().slice(0,10);}
 function process(rows){
   records=[]; const dset=new Set();
   rows.forEach(r=>{
@@ -248,7 +290,7 @@ function process(rows){
             actual=colVal(r,m,['actual']), utr=colVal(r,m,['utr']), delays=colVal(r,m,['delay']);
       if(shifts>0||planned>0||actual>0||orders>0){
         records.push({riderId:id,contract,martCode:m,martName:MARTS[m].name,zone:MARTS[m].zone,date,
-          monday:date?mondayOf(date):'',shifts,actualHours:actual,delays,orders,utr,isNew,isAbsent:actual===0});
+          monday:date?mondayOf(date):'',dow:date?dowOf(date):0,shifts,actualHours:actual,delays,orders,utr,isNew,isAbsent:actual===0});
       }
     });
   });
@@ -280,7 +322,7 @@ function chip(label,on,fn,cls){return `<button class="chip ${cls||''} ${on?'on':
 
 function renderChips(){
   const periods=[['latest','آخر يوم'],['w0','هذا الأسبوع']];
-  if(mondays.length>1)periods.push(['w1','الأسبوع السابق']);
+  if(mondays.length>1){periods.push(['w1','الأسبوع السابق']);periods.push(['cmp','مقارنة الأسبوعين']);}
   periods.push(['all','الكل']);
   document.getElementById('chips-period').innerHTML=periods.map(p=>chip(p[1],state.period===p[0],`setPeriod('${p[0]}')`)).join('');
 
@@ -352,6 +394,10 @@ function buildRows(rs){
 function render(){
   renderChips();
   if(!records.length)return;
+  const isCmp=state.period==='cmp';
+  document.getElementById('listview').classList.toggle('hidden',isCmp);
+  document.getElementById('cmp').classList.toggle('hidden',!isCmp);
+  if(isCmp){renderCmp();return;}
   const rs=periodRecords();
   renderKpis(rs);
   const shown=rs.filter(r=>(state.mart==='all'||r.martCode===state.mart)&&
@@ -371,7 +417,7 @@ function render(){
 
   const tb=document.getElementById('tb');
   if(!rows.length){tb.innerHTML=`<tr><td class="empty" colspan="${COLS.length}">لا توجد سجلات لهذا الاختيار</td></tr>`;return;}
-  tb.innerHTML=rows.map(r=>`<tr class="${r.isAbsent?'absent':''}">
+  tb.innerHTML=rows.map(r=>`<tr data-id="${esc(r.riderId)}" class="${r.isAbsent?'absent':''}">
     <td class="first">${r.riderId}${r.sub?`<i class="${r.isNew?'new':''}">${r.sub}</i>`:''}</td>
     <td>${r.contract}</td><td>${r.martName}</td>
     <td class="num">${r.shifts}</td>
@@ -381,6 +427,121 @@ function render(){
     <td class="num">${r.avgOrdersPerDay}</td>
     <td class="num hl">${r.utr}</td>
     <td class="num ${r.delays>0?'dl':''}">${r.delays}</td></tr>`).join('');
+}
+/* ---------- helpers ---------- */
+const $=id=>document.getElementById(id);
+const DAYS=['إث','ثل','أر','خم','جم','سب','أح'];
+const esc=s=>String(s).replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const fmt=x=>(Math.round(x*10)/10).toLocaleString();
+function delta(diff,pct,digits){
+  if(Math.abs(diff)<0.05)return '<span class="dl2 flat">—</span>';
+  const cls=diff>0?'up':'down', ar=diff>0?'▲':'▼';
+  const v=pct?Math.abs(Math.round(diff))+'%':(Math.round(Math.abs(diff)*Math.pow(10,digits))/Math.pow(10,digits));
+  return `<span class="dl2 ${cls}">${ar} ${v}</span>`;
+}
+function openFromRow(e){
+  let n=e.target;
+  while(n&&n.tagName!=='TR'&&n.id!=='cmp')n=n.parentNode;
+  if(n&&n.dataset&&n.dataset.id)openRider(n.dataset.id);
+}
+$('tb').onclick=openFromRow;
+$('cmp').onclick=function(e){
+  let n=e.target;
+  while(n&&!(n.dataset&&n.dataset.id)&&n!==this)n=n.parentNode;
+  if(n&&n.dataset&&n.dataset.id)openRider(n.dataset.id);
+};
+
+/* ---------- rider detail ---------- */
+let riderId=null, riderWeek=0;
+function openRider(id){
+  riderId=id;
+  riderWeek=(state.period==='w1'&&mondays.length>1)?1:0;
+  drawRider();
+  $('rider').classList.remove('hidden');
+  $('rider').scrollTop=0;
+  document.body.style.overflow='hidden';
+  history.pushState({r:1},'');
+}
+function hideRider(){$('rider').classList.add('hidden');document.body.style.overflow='';}
+function closeRider(){if(history.state&&history.state.r)history.back();else hideRider();}
+window.addEventListener('popstate',hideRider);
+function setRiderWeek(i){riderWeek=i;drawRider();}
+function drawRider(){
+  const mon=mondays[riderWeek];
+  const recs=records.filter(r=>r.riderId===riderId&&r.monday===mon);
+  const any=records.find(r=>r.riderId===riderId);
+  $('r-id').innerText=riderId;
+  $('r-sub').innerText=(any?any.contract:'')+' · '+[...new Set(records.filter(r=>r.riderId===riderId).map(r=>r.martName))].join('، ');
+  $('r-weeks').innerHTML=mondays.slice(0,4).map((m,i)=>
+    chip(i===0?'هذا الأسبوع':(i===1?'السابق':'أسبوع '+m.slice(5)),i===riderWeek,`setRiderWeek(${i})`,'sm')).join('');
+  const days=[];
+  for(let i=0;i<7;i++)days.push({date:addDays(mon,i),has:false,orders:0,hours:0,marts:new Set()});
+  recs.forEach(r=>{const d=days[r.dow];d.has=true;d.orders+=r.orders;d.hours+=r.actualHours;d.marts.add(r.martName);});
+  let O=0,H=0,ab=0;
+  days.forEach(d=>{O+=d.orders;H+=d.hours;if(d.has&&d.hours===0)ab++;});
+  const mx=Math.max(1,...days.map(d=>d.orders));
+  const bars=days.map((d,i)=>{
+    const cls=!d.has?'nd':(d.hours===0?'ab':'');
+    const ht=!d.has?4:Math.max(6,Math.round(d.orders/mx*70));
+    return `<div class="bc"><div class="bv">${d.has?Math.round(d.orders):''}</div><div class="bb ${cls}" style="height:${ht}px"></div><div class="bl">${DAYS[i]}</div></div>`;
+  }).join('');
+  const rows=days.filter(d=>d.has).map(d=>`<tr class="${d.hours===0?'absent':''}"><td>${weekdayLabel(d.date)}</td><td>${[...d.marts].join('، ')}</td><td>${d.hours===0?'غائب':fmt(d.hours)}</td><td>${Math.round(d.orders)}</td><td>${d.hours>0?(d.orders/d.hours).toFixed(2):0}</td></tr>`).join('');
+  $('r-body').innerHTML=recs.length?`
+    <div class="kpis">
+      <div class="kpi"><span>طلبات</span><b>${Math.round(O)}</b></div>
+      <div class="kpi"><span>ساعات</span><b>${fmt(H)}</b></div>
+      <div class="kpi"><span>UTR</span><b>${H>0?(O/H).toFixed(2):0}</b></div>
+      <div class="kpi"><span>أيام غياب</span><b class="${ab?'down':''}">${ab}</b></div>
+    </div>
+    <div class="card"><h3>الطلبات بالأيام</h3><div class="chart">${bars}</div></div>
+    <div class="card"><h3>تفاصيل الأيام</h3><table class="dt"><tr><th>اليوم</th><th>المارت</th><th>ساعات</th><th>طلبات</th><th>UTR</th></tr>${rows}</table></div>`
+    :'<div class="card empty">لا توجد سجلات لهذا المندوب في هذا الأسبوع</div>';
+}
+
+/* ---------- week over week ---------- */
+function stats(rs){
+  let o=0,h=0;const act=new Set();
+  rs.forEach(r=>{o+=r.orders;h+=r.actualHours;if(r.actualHours>0)act.add(r.riderId);});
+  return {orders:o,hours:h,riders:act.size,utr:h>0?o/h:0,hpr:act.size?h/act.size:0};
+}
+function renderCmp(){
+  const el=$('cmp');
+  if(mondays.length<2){el.innerHTML='<div class="card empty">المقارنة تحتاج بيانات أسبوعين على الأقل</div>';return;}
+  const cur=mondays[0], prev=mondays[1];
+  const n=Math.max(...dates.filter(d=>mondayOf(d)===cur).map(dowOf))+1;
+  const ok=r=>state.mart==='all'||r.martCode===state.mart;
+  const curAll=records.filter(r=>r.monday===cur&&ok(r));
+  const prevAll=records.filter(r=>r.monday===prev&&ok(r));
+  const A=curAll, B=prevAll.filter(r=>r.dow<n);
+  const sa=stats(A), sb=stats(B);
+  const pct=(a,b)=>b?((a-b)/b*100):0;
+  const card=(l,v,d)=>`<div class="kpi"><span>${l}</span><b>${v}</b>${d}</div>`;
+  const cards=
+    card('إجمالي الطلبات',Math.round(sa.orders).toLocaleString(),delta(pct(sa.orders,sb.orders),true,0))+
+    card('مناديب نشطين',sa.riders,delta(sa.riders-sb.riders,false,0))+
+    card('ساعات/مندوب',fmt(sa.hpr),delta(sa.hpr-sb.hpr,false,1))+
+    card('UTR',sa.utr.toFixed(2),delta(sa.utr-sb.utr,false,2));
+  const oc=Array(7).fill(0), op=Array(7).fill(0);
+  curAll.forEach(r=>oc[r.dow]+=r.orders);
+  prevAll.forEach(r=>op[r.dow]+=r.orders);
+  const mx=Math.max(1,...oc,...op);
+  const bars=DAYS.map((d,i)=>`<div class="bc"><div class="pair"><i style="height:${Math.round(oc[i]/mx*84)}px;background:var(--pri)"></i><i style="height:${Math.round(op[i]/mx*84)}px;background:#c5cbc2"></i></div><div class="bl">${d}</div></div>`).join('');
+  const m=new Map();
+  const add=(rs,k)=>rs.forEach(r=>{if(!m.has(r.riderId))m.set(r.riderId,{o:{a:0,b:0},h:{a:0,b:0}});const x=m.get(r.riderId);x.o[k]+=r.orders;x.h[k]+=r.actualHours;});
+  add(A,'a');add(B,'b');
+  const mv=[];
+  m.forEach((x,id)=>{if(x.h.a>=5&&x.h.b>=5){const ua=x.o.a/x.h.a,ub=x.o.b/x.h.b;mv.push({id,ua,ub,d:ua-ub});}});
+  mv.sort((p,q)=>q.d-p.d);
+  const row=x=>`<div class="mv" data-id="${esc(x.id)}"><span>${x.id}<br><small>${x.ub.toFixed(2)} ← ${x.ua.toFixed(2)}</small></span><span class="${x.d>0?'up':'down'}" style="font-weight:800">${x.d>0?'▲':'▼'} ${Math.abs(x.d).toFixed(2)}</span></div>`;
+  const up=mv.filter(x=>x.d>0).slice(0,5), down=mv.filter(x=>x.d<0).slice(-5).reverse();
+  el.innerHTML=`
+    <p class="note">مقارنة أول ${n} ${n===1?'يوم':'أيام'} من كل أسبوع (من ${cur} ومن ${prev}) حتى تكون المقارنة عادلة.</p>
+    <div class="kpis">${cards}</div>
+    <div class="card"><h3>الطلبات بالأيام</h3><div class="chart">${bars}</div>
+      <div class="lg"><span><b style="background:var(--pri)"></b>هذا الأسبوع</span><span><b style="background:#c5cbc2"></b>الأسبوع السابق</span></div></div>
+    <div class="card"><h3>الأكثر تحسناً في UTR</h3>${up.length?up.map(row).join(''):'<p class="note">لا يوجد</p>'}</div>
+    <div class="card"><h3>الأكثر تراجعاً في UTR</h3>${down.length?down.map(row).join(''):'<p class="note">لا يوجد</p>'}
+      <p class="note" style="margin-top:8px">يشمل المناديب الذين عملوا 5 ساعات على الأقل في كل أسبوع.</p></div>`;
 }
 </script>
 </body>
