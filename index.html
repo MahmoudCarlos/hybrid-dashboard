@@ -73,7 +73,10 @@ td.dl{color:var(--amb);font-weight:700}
 .stack{display:grid;gap:12px}
 tr[data-id]{cursor:pointer}
 tr[data-id]:active td{filter:brightness(.96)}
-.dl2{display:block;font-size:12px;font-weight:700;margin-top:1px}
+.dl2{display:inline-block;font-size:12px;font-weight:800;margin-top:3px;padding:1px 9px;border-radius:999px}
+.dl2.up{background:#dcfce7;color:#166534}.dl2.down{background:#fee2e2;color:#991b1b}.dl2.flat{background:#eef0ec;color:var(--mut)}
+.kpi.gk{border-top:4px solid #16a34a;background:#f0fdf4}.kpi.rk{border-top:4px solid #dc2626;background:#fef2f2}
+.mv.gk{background:#f0fdf4}.mv.rk{background:#fef2f2}.mv{padding-right:8px;padding-left:8px;border-radius:8px;margin-top:4px;border-top:0}
 .up{color:#15803d}.down{color:#b91c1c}.flat{color:var(--mut)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
 .card h3{margin:0 0 8px;font-size:14px;font-weight:800}
@@ -294,11 +297,17 @@ function process(rows){
       }
     });
   });
-  dates=[...dset].sort(); latest=dates[dates.length-1]||'';
+  const tot={};
+  records.forEach(r=>{const t=tot[r.date]||(tot[r.date]={o:0,h:0});t.o+=r.orders;t.h+=r.actualHours;});
+  const hs=Object.values(tot).map(t=>t.h).sort((a,b)=>a-b);
+  const med=hs[Math.floor(hs.length/2)]||0;
+  const partial=Object.keys(tot).filter(d=>tot[d].o===0||tot[d].h<0.4*med).sort();
+  records=records.filter(r=>r.date&&!partial.includes(r.date));
+  dates=[...new Set(records.map(r=>r.date))].sort(); latest=dates[dates.length-1]||'';
   mondays=[...new Set(dates.map(mondayOf))].sort().reverse();
   state.period='latest'; state.day=null;
   setStatus(latest?('بيانات يوم '+latest):'لا توجد بيانات');
-  showMsg(records.length?'':'تم قراءة الملف لكن بدون سجلات صالحة. تأكد من صف العناوين.');
+  showMsg(!records.length?'تم قراءة الملف لكن بدون سجلات صالحة. تأكد من صف العناوين.':(partial.length?('ملاحظة: يوم '+partial.join('، ')+' غير مكتمل في الملف (لا توجد طلبات وساعات العمل قليلة جداً) فلم يُحتسب. أحدث يوم مكتمل هو '+latest+'.'):''));
   render();
 }
 
@@ -515,30 +524,30 @@ function renderCmp(){
   const A=curAll, B=prevAll.filter(r=>r.dow<n);
   const sa=stats(A), sb=stats(B);
   const pct=(a,b)=>b?((a-b)/b*100):0;
-  const card=(l,v,d)=>`<div class="kpi"><span>${l}</span><b>${v}</b>${d}</div>`;
+  const card=(l,v,d,df)=>`<div class="kpi ${Math.abs(df)<0.05?'':(df>0?'gk':'rk')}"><span>${l}</span><b>${v}</b>${d}</div>`;
   const cards=
-    card('إجمالي الطلبات',Math.round(sa.orders).toLocaleString(),delta(pct(sa.orders,sb.orders),true,0))+
-    card('مناديب نشطين',sa.riders,delta(sa.riders-sb.riders,false,0))+
-    card('ساعات/مندوب',fmt(sa.hpr),delta(sa.hpr-sb.hpr,false,1))+
-    card('UTR',sa.utr.toFixed(2),delta(sa.utr-sb.utr,false,2));
+    card('إجمالي الطلبات',Math.round(sa.orders).toLocaleString(),delta(pct(sa.orders,sb.orders),true,0),pct(sa.orders,sb.orders))+
+    card('مناديب نشطين',sa.riders,delta(sa.riders-sb.riders,false,0),sa.riders-sb.riders)+
+    card('ساعات/مندوب',fmt(sa.hpr),delta(sa.hpr-sb.hpr,false,1),sa.hpr-sb.hpr)+
+    card('UTR',sa.utr.toFixed(2),delta(sa.utr-sb.utr,false,2),sa.utr-sb.utr);
   const oc=Array(7).fill(0), op=Array(7).fill(0);
   curAll.forEach(r=>oc[r.dow]+=r.orders);
   prevAll.forEach(r=>op[r.dow]+=r.orders);
   const mx=Math.max(1,...oc,...op);
-  const bars=DAYS.map((d,i)=>`<div class="bc"><div class="pair"><i style="height:${Math.round(oc[i]/mx*84)}px;background:var(--pri)"></i><i style="height:${Math.round(op[i]/mx*84)}px;background:#c5cbc2"></i></div><div class="bl">${d}</div></div>`).join('');
+  const bars=DAYS.map((d,i)=>`<div class="bc"><div class="pair"><i style="height:${Math.round(oc[i]/mx*84)}px;background:${oc[i]>=op[i]?'#16a34a':'#dc2626'}"></i><i style="height:${Math.round(op[i]/mx*84)}px;background:#c5cbc2"></i></div><div class="bl">${d}</div></div>`).join('');
   const m=new Map();
   const add=(rs,k)=>rs.forEach(r=>{if(!m.has(r.riderId))m.set(r.riderId,{o:{a:0,b:0},h:{a:0,b:0}});const x=m.get(r.riderId);x.o[k]+=r.orders;x.h[k]+=r.actualHours;});
   add(A,'a');add(B,'b');
   const mv=[];
   m.forEach((x,id)=>{if(x.h.a>=5&&x.h.b>=5){const ua=x.o.a/x.h.a,ub=x.o.b/x.h.b;mv.push({id,ua,ub,d:ua-ub});}});
   mv.sort((p,q)=>q.d-p.d);
-  const row=x=>`<div class="mv" data-id="${esc(x.id)}"><span>${x.id}<br><small>${x.ub.toFixed(2)} ← ${x.ua.toFixed(2)}</small></span><span class="${x.d>0?'up':'down'}" style="font-weight:800">${x.d>0?'▲':'▼'} ${Math.abs(x.d).toFixed(2)}</span></div>`;
+  const row=x=>`<div class="mv ${x.d>0?'gk':'rk'}" data-id="${esc(x.id)}"><span>${x.id}<br><small>${x.ub.toFixed(2)} ← ${x.ua.toFixed(2)}</small></span><span class="dl2 ${x.d>0?'up':'down'}">${x.d>0?'▲':'▼'} ${Math.abs(x.d).toFixed(2)}</span></div>`;
   const up=mv.filter(x=>x.d>0).slice(0,5), down=mv.filter(x=>x.d<0).slice(-5).reverse();
   el.innerHTML=`
     <p class="note">مقارنة أول ${n} ${n===1?'يوم':'أيام'} من كل أسبوع (من ${cur} ومن ${prev}) حتى تكون المقارنة عادلة.</p>
     <div class="kpis">${cards}</div>
     <div class="card"><h3>الطلبات بالأيام</h3><div class="chart">${bars}</div>
-      <div class="lg"><span><b style="background:var(--pri)"></b>هذا الأسبوع</span><span><b style="background:#c5cbc2"></b>الأسبوع السابق</span></div></div>
+      <div class="lg"><span><b style="background:#16a34a"></b>أعلى من السابق</span><span><b style="background:#dc2626"></b>أقل من السابق</span><span><b style="background:#c5cbc2"></b>الأسبوع السابق</span></div></div>
     <div class="card"><h3>الأكثر تحسناً في UTR</h3>${up.length?up.map(row).join(''):'<p class="note">لا يوجد</p>'}</div>
     <div class="card"><h3>الأكثر تراجعاً في UTR</h3>${down.length?down.map(row).join(''):'<p class="note">لا يوجد</p>'}
       <p class="note" style="margin-top:8px">يشمل المناديب الذين عملوا 5 ساعات على الأقل في كل أسبوع.</p></div>`;
