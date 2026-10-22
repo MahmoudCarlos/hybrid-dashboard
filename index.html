@@ -31,3 +31,357 @@ button{font:inherit;cursor:pointer}
 .row::-webkit-scrollbar{display:none}
 .chip{flex:none;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#f8f9f6;font-weight:700;font-size:13px;color:#344054}
 .chip.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.chip.sm{min-height:34px;padding:0 11px;font-size:12px}
+.chip.mart{background:#fff}
+.chip.mart.on{background:var(--ink);border-color:var(--ink)}
+
+main{padding:12px;display:grid;gap:12px;padding-bottom:calc(env(safe-area-inset-bottom) + 16px)}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.kpi span{display:block;font-size:12px;font-weight:600;color:var(--mut)}
+.kpi b{display:block;font-size:24px;font-weight:800;line-height:1.3}
+.strip{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}
+.strip::-webkit-scrollbar{display:none}
+.tile{flex:none;min-width:96px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:center}
+.tile span{display:block;font-size:11px;font-weight:600;color:var(--mut)}
+.tile b{font-size:18px;font-weight:800}
+.tools{display:flex;gap:8px;align-items:center}
+.tools input{flex:1;min-width:0;height:44px;border:1px solid var(--line);border-radius:12px;padding:0 12px;font:inherit;font-size:14px;background:#fff}
+.seg{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;flex:none}
+.seg button{height:44px;padding:0 12px;border:0;background:#fff;font-weight:700;font-size:13px;color:#344054}
+.seg button.on{background:var(--ink);color:#fff}
+.count{font-size:12px;font-weight:700;color:var(--mut);margin:0 2px}
+
+/* table with frozen first column */
+.tw{overflow:auto;max-height:68dvh;background:#fff;border:1px solid var(--line);border-radius:12px;-webkit-overflow-scrolling:touch}
+table{border-collapse:separate;border-spacing:0;width:max-content;min-width:100%;font-size:13px}
+th,td{padding:10px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid #eef0ec;background:#fff}
+th{position:sticky;top:0;z-index:2;background:#eef1ec;font-weight:800;font-size:12px;color:#344054;cursor:pointer;user-select:none}
+th.first,td.first{position:sticky;right:0;z-index:1;box-shadow:-1px 0 0 var(--line)}
+th.first{z-index:3}
+td.first{font-weight:800;min-width:84px}
+td.first i{display:block;font-style:normal;font-size:10px;font-weight:600;color:var(--mut)}
+td.first i.new{color:#7e22ce}
+tr.absent td{background:var(--bad);color:var(--badtx)}
+td.num{font-variant-numeric:tabular-nums}
+td.hl{font-weight:800;color:var(--pri)}
+td.dl{color:var(--amb);font-weight:700}
+.msg{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:12px;padding:12px;font-size:13px;line-height:1.7;word-break:break-word}
+.empty{padding:28px;text-align:center;color:var(--mut)}
+.legend{font-size:12px;color:var(--mut)}
+.legend::before{content:"";display:inline-block;width:12px;height:12px;background:var(--bad);border:1px solid #fca5a5;border-radius:3px;margin-left:6px;vertical-align:-2px}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="box">
+    <h2 style="margin:0">لوحة أداء المناديب</h2>
+    <input type="password" id="pwd" placeholder="كلمة المرور" onkeypress="if(event.key==='Enter')checkPassword()">
+    <button class="go" onclick="checkPassword()">دخول</button>
+    <p id="login-error" class="hidden">كلمة المرور غير صحيحة</p>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <div class="bar">
+    <div class="top">
+      <div>
+        <h1>أداء أسطول Hybrid</h1>
+        <small id="status">جاري التحميل...</small>
+      </div>
+      <div class="icons">
+        <input type="file" id="file" accept=".csv" class="hidden" onchange="handleManualFile(event)">
+        <button class="ib" title="رفع ملف" onclick="document.getElementById('file').click()">📁</button>
+        <button class="ib" title="تحديث" onclick="loadFromGitHub()">🔄</button>
+        <button class="ib" title="قفل" onclick="logout()">🔒</button>
+      </div>
+    </div>
+    <div class="row" id="chips-period"></div>
+    <div class="row hidden" id="chips-day"></div>
+    <div class="row" id="chips-mart"></div>
+  </div>
+
+  <main>
+    <div id="msg" class="msg hidden"></div>
+    <div class="kpis">
+      <div class="kpi"><span>طلبات الشروق</span><b id="k-shorouk">0</b></div>
+      <div class="kpi"><span>طلبات العبور</span><b id="k-obour">0</b></div>
+      <div class="kpi"><span>متوسط ساعات المندوب</span><b id="k-hours">0</b></div>
+      <div class="kpi"><span>متوسط طلبات المندوب</span><b id="k-orders">0</b></div>
+    </div>
+    <div class="strip" id="marts"></div>
+
+    <div class="tools">
+      <input type="search" id="search" placeholder="بحث برقم المندوب أو المقاول" oninput="state.search=this.value.toLowerCase().trim();render()">
+      <div class="seg">
+        <button id="v-summary" class="on" onclick="setView('summary')">مجمّع</button>
+        <button id="v-daily" onclick="setView('daily')">بالأيام</button>
+      </div>
+    </div>
+    <div class="count" id="count"></div>
+
+    <div class="tw"><table><thead><tr id="thead"></tr></thead><tbody id="tb"></tbody></table></div>
+    <div class="legend">صف أحمر = مندوب غائب (0 ساعات فعلية)</div>
+  </main>
+</div>
+
+<script>
+const MARTS = {
+  '10223':{name:'شروق 1',zone:'shorouk'},'10187':{name:'شروق 3',zone:'shorouk'},'10233':{name:'شروق حي 8',zone:'shorouk'},
+  '10177':{name:'عبور',zone:'obour'},'10207':{name:'عبور صناعية',zone:'obour'},'10260':{name:'عبور جولف',zone:'obour'}
+};
+const COLS = [
+  {k:'riderId',l:'المندوب',first:1},{k:'contract',l:'المقاول'},{k:'martName',l:'المارت'},
+  {k:'shifts',l:'أيام'},{k:'actualHours',l:'ساعات'},{k:'avgHoursPerDay',l:'س/يوم'},
+  {k:'orders',l:'طلبات'},{k:'avgOrdersPerDay',l:'ط/يوم'},{k:'utr',l:'UTR'},{k:'delays',l:'تأخير'}
+];
+let records = [], dates = [], mondays = [], latest = '';
+const state = {period:'latest', day:null, mart:'all', view:'summary', search:'', sort:'utr', dir:'desc'};
+
+/* ---------- login ---------- */
+function checkPassword(){
+  if(document.getElementById('pwd').value==='admin123'){localStorage.setItem('auth_token','true');showApp();}
+  else document.getElementById('login-error').classList.remove('hidden');
+}
+function logout(){localStorage.removeItem('auth_token');location.reload();}
+function showApp(){
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  renderChips();
+  document.getElementById('tb').innerHTML='<tr><td class="empty" colspan="10">جاري تحميل البيانات...</td></tr>';
+  loadFromGitHub();
+}
+window.addEventListener('DOMContentLoaded',()=>{if(localStorage.getItem('auth_token')==='true')showApp();});
+
+/* ---------- loading ---------- */
+function setStatus(t){document.getElementById('status').innerText=t;}
+function showMsg(t){const m=document.getElementById('msg');if(!t){m.classList.add('hidden');return;}m.innerText=t;m.classList.remove('hidden');}
+window.onerror=function(msg,src,line){showMsg('خطأ في الصفحة: '+msg+' (سطر '+line+')');};
+function loadFromGitHub(){
+  setStatus('جاري القراءة...');showMsg('');
+  const cb='?v='+Date.now();
+  const list=['data.csv','data.csv.csv','Data.csv','Data_csv.csv','data_csv.csv','data','test_new_hyb.csv'];
+  const tried=[];
+  function tryApi(){
+    const parts=location.pathname.split('/').filter(Boolean);
+    const user=location.hostname.split('.')[0];
+    if(!location.hostname.endsWith('github.io')||!parts.length){fail();return;}
+    fetch('https://api.github.com/repos/'+user+'/'+parts[0]+'/contents/')
+      .then(r=>r.json())
+      .then(files=>{
+        const f=files.find(x=>/\.csv/i.test(x.name));
+        if(!f)throw 0;
+        tried.push(f.name);
+        return fetch(f.name+cb).then(r=>{if(!r.ok)throw 0;return r.text();}).then(t=>parseCSV(t));
+      }).catch(fail);
+  }
+  function fail(){
+    setStatus('تعذر تحميل الملف');
+    showMsg('لم أجد ملف البيانات بجانب الصفحة. جرّبت: '+list.join(' ، ')+'\nتأكد أن اسم الملف في GitHub مطابق تماماً (الحروف الكبيرة والصغيرة تفرق)، أو اضغط 📁 لرفعه يدوياً.');
+  }
+  (function next(i){
+    if(i>=list.length){tryApi();return;}
+    fetch(list[i]+cb).then(r=>{if(!r.ok)throw 0;return r.text();})
+      .then(t=>{tried.push(list[i]);parseCSV(t);}).catch(()=>next(i+1));
+  })(0);
+}
+function handleManualFile(e){
+  const f=e.target.files[0]; if(!f)return;
+  const rd=new FileReader(); rd.onload=ev=>parseCSV(ev.target.result); rd.readAsText(f);
+}
+
+/* ---------- parsing (same logic as before) ---------- */
+function parseCSV(text){
+  try{parseCSVInner(text);}catch(e){setStatus('خطأ في قراءة الملف');showMsg('تعذرت قراءة الملف: '+e.message);}
+}
+function parseCSVInner(text){
+  const rows=Papa.parse(text.trim(),{header:false,skipEmptyLines:true}).data;
+  if(!rows||rows.length<2)throw new Error('الملف فارغ');
+  const r0=rows[0], r1=rows[1], keys=Object.keys(MARTS);
+  const martCount=r0.filter(c=>keys.some(m=>(c||'').includes(m))).length;
+  const hasRider=r1.some(c=>{c=(c||'').toLowerCase();return c.includes('rider')||c.includes('id');});
+  let headers=[], data;
+  if(martCount>=2&&hasRider){
+    for(let i=0;i<Math.max(r0.length,r1.length);i++){
+      const m=(r0[i]||'').trim(), x=(r1[i]||'').trim();
+      headers.push(m&&x&&m!==x?m+'/'+x:(x||m||''));
+    }
+    data=rows.slice(2);
+  }else{headers=r0.map(c=>(c||'').trim());data=rows.slice(1);}
+  const objs=data.map(r=>{const o={};headers.forEach((h,j)=>{if(h)o[h]=r[j]!=null?String(r[j]).trim():'';});return o;});
+  process(objs);
+}
+function num(v){v=(v||'').toString().replace(/,/g,'').replace(/\\/g,'').trim();const n=parseFloat(v);return isNaN(n)?0:n;}
+function colVal(row,mart,words){
+  for(const k in row){
+    if(k.includes(mart)){const kl=k.toLowerCase();if(kl.includes('avg'))continue;if(words.some(w=>kl.includes(w)))return num(row[k]);}
+  }
+  return 0;
+}
+function general(row,words){ // words checked in priority order
+  for(const w of words){
+    for(const k in row){
+      if(k.toLowerCase().includes(w)){const v=(row[k]||'').toString().replace(/\\/g,'').trim();if(v)return v;}
+    }
+  }
+  return '';
+}
+function mondayOf(ds){
+  const [y,m,d]=ds.split('-').map(Number), dt=new Date(Date.UTC(y,m-1,d)), day=dt.getUTCDay();
+  dt.setUTCDate(dt.getUTCDate()+(day===0?-6:1)-day);
+  return dt.toISOString().slice(0,10);
+}
+function process(rows){
+  records=[]; const dset=new Set();
+  rows.forEach(r=>{
+    const id=general(r,['rider id','كود','id']);
+    if(!id||isNaN(parseInt(id)))return;
+    const contract=general(r,['contract','اسم'])||'غير محدد';
+    const date=general(r,['created','تاريخ']).slice(0,10);
+    if(date)dset.add(date);
+    const isNew=/^2026-(09|10|11)/.test(date);
+    Object.keys(MARTS).forEach(m=>{
+      const comp=colVal(r,m,['completed']), tot=colVal(r,m,['total logistics orders']);
+      const orders=comp>0?comp:tot;
+      const shifts=colVal(r,m,['shifts']), planned=colVal(r,m,['planned']),
+            actual=colVal(r,m,['actual']), utr=colVal(r,m,['utr']), delays=colVal(r,m,['delay']);
+      if(shifts>0||planned>0||actual>0||orders>0){
+        records.push({riderId:id,contract,martCode:m,martName:MARTS[m].name,zone:MARTS[m].zone,date,
+          monday:date?mondayOf(date):'',shifts,actualHours:actual,delays,orders,utr,isNew,isAbsent:actual===0});
+      }
+    });
+  });
+  dates=[...dset].sort(); latest=dates[dates.length-1]||'';
+  mondays=[...new Set(dates.map(mondayOf))].sort().reverse();
+  state.period='latest'; state.day=null;
+  setStatus(latest?('بيانات يوم '+latest):'لا توجد بيانات');
+  showMsg(records.length?'':'تم قراءة الملف لكن بدون سجلات صالحة. تأكد من صف العناوين.');
+  render();
+}
+
+/* ---------- state setters ---------- */
+function setPeriod(p){state.period=p;state.day=null;render();}
+function setDay(d){state.day=d;render();}
+function setMart(m){state.mart=m;render();}
+function setView(v){state.view=v;render();}
+function sortBy(k){
+  if(state.sort===k)state.dir=state.dir==='desc'?'asc':'desc';
+  else{state.sort=k;state.dir='desc';}
+  render();
+}
+
+/* ---------- render ---------- */
+function weekdayLabel(ds){
+  const wd=new Intl.DateTimeFormat('ar-EG',{weekday:'short',timeZone:'UTC'}).format(new Date(ds+'T00:00:00Z'));
+  return wd+' '+ds.slice(8);
+}
+function chip(label,on,fn,cls){return `<button class="chip ${cls||''} ${on?'on':''}" onclick="${fn}">${label}</button>`;}
+
+function renderChips(){
+  const periods=[['latest','آخر يوم'],['w0','هذا الأسبوع']];
+  if(mondays.length>1)periods.push(['w1','الأسبوع السابق']);
+  periods.push(['all','الكل']);
+  document.getElementById('chips-period').innerHTML=periods.map(p=>chip(p[1],state.period===p[0],`setPeriod('${p[0]}')`)).join('');
+
+  const dayRow=document.getElementById('chips-day');
+  if(state.period==='w0'||state.period==='w1'){
+    const mon=mondays[state.period==='w0'?0:1];
+    const days=dates.filter(d=>mondayOf(d)===mon);
+    dayRow.innerHTML=chip('كل الأيام',!state.day,'setDay(null)','sm')+days.map(d=>chip(weekdayLabel(d),state.day===d,`setDay('${d}')`,'sm')).join('');
+    dayRow.classList.remove('hidden');
+  }else dayRow.classList.add('hidden');
+
+  document.getElementById('chips-mart').innerHTML=
+    chip('كل المارتات',state.mart==='all',"setMart('all')",'mart')+
+    Object.keys(MARTS).map(m=>chip(MARTS[m].name,state.mart===m,`setMart('${m}')`,'mart')).join('');
+
+  document.getElementById('v-summary').classList.toggle('on',state.view==='summary');
+  document.getElementById('v-daily').classList.toggle('on',state.view==='daily');
+}
+
+function periodRecords(){
+  let rs;
+  if(state.period==='latest')rs=records.filter(r=>r.date===latest);
+  else if(state.period==='w0')rs=records.filter(r=>r.monday===mondays[0]);
+  else if(state.period==='w1')rs=records.filter(r=>r.monday===mondays[1]);
+  else rs=records;
+  if(state.day)rs=rs.filter(r=>r.date===state.day);
+  return rs;
+}
+
+function renderKpis(rs){
+  let sh=0,ob=0,hrs=0,ord=0; const mt={}; const active=new Set();
+  Object.keys(MARTS).forEach(m=>mt[m]=0);
+  rs.forEach(r=>{
+    if(r.orders>0){mt[r.martCode]+=r.orders;ord+=r.orders;r.zone==='shorouk'?sh+=r.orders:ob+=r.orders;}
+    if(r.actualHours>0){hrs+=r.actualHours;active.add(r.riderId);}
+  });
+  const n=active.size||1, f=x=>Math.round(x).toLocaleString();
+  document.getElementById('k-shorouk').innerText=f(sh);
+  document.getElementById('k-obour').innerText=f(ob);
+  document.getElementById('k-hours').innerText=(hrs/n).toFixed(1)+' س';
+  document.getElementById('k-orders').innerText=f(ord/n);
+  document.getElementById('marts').innerHTML=Object.keys(MARTS).map(m=>`<div class="tile"><span>${MARTS[m].name}</span><b>${f(mt[m])}</b></div>`).join('');
+}
+
+function buildRows(rs){
+  if(state.view==='daily'){
+    return rs.map(r=>({riderId:r.riderId,sub:r.date,contract:r.contract,martName:r.martName,
+      shifts:r.actualHours>0?1:0,actualHours:+r.actualHours.toFixed(2),avgHoursPerDay:+r.actualHours.toFixed(2),
+      orders:Math.round(r.orders),avgOrdersPerDay:Math.round(r.orders),delays:+r.delays.toFixed(1),
+      utr:+r.utr.toFixed(2),isAbsent:r.isAbsent}));
+  }
+  const map=new Map();
+  rs.forEach(r=>{
+    const key=r.riderId+'_'+r.martCode;
+    if(!map.has(key))map.set(key,{riderId:r.riderId,contract:r.contract,martName:r.martName,isNew:r.isNew,days:0,h:0,o:0,d:0});
+    const it=map.get(key);
+    if(r.actualHours>0)it.days++;
+    it.h+=r.actualHours;it.o+=r.orders;it.d+=r.delays;
+  });
+  return [...map.values()].map(it=>{
+    const days=it.days||1;
+    return {riderId:it.riderId,sub:it.isNew?'كود جديد':'',isNew:it.isNew,contract:it.contract,martName:it.martName,
+      shifts:it.days,actualHours:+it.h.toFixed(2),avgHoursPerDay:+(it.h/days).toFixed(2),
+      orders:Math.round(it.o),avgOrdersPerDay:+(it.o/days).toFixed(1),delays:+it.d.toFixed(1),
+      utr:it.h>0?+(it.o/it.h).toFixed(2):0,isAbsent:it.h===0};
+  });
+}
+
+function render(){
+  renderChips();
+  if(!records.length)return;
+  const rs=periodRecords();
+  renderKpis(rs);
+  const shown=rs.filter(r=>(state.mart==='all'||r.martCode===state.mart)&&
+    (r.riderId.includes(state.search)||r.contract.toLowerCase().includes(state.search)));
+  const rows=buildRows(shown);
+  const k=state.sort, s=state.dir==='asc'?1:-1;
+  rows.sort((a,b)=>{
+    let x=a[k],y=b[k];
+    if(typeof x==='string')return s*x.localeCompare(y,'ar');
+    if(x===y&&k==='utr')return b.orders-a.orders;
+    return x===y?0:(x>y?s:-s);
+  });
+  document.getElementById('count').innerText='العدد: '+rows.length;
+
+  document.getElementById('thead').innerHTML=COLS.map(c=>
+    `<th class="${c.first?'first':''}" onclick="sortBy('${c.k}')">${c.l}${state.sort===c.k?(state.dir==='desc'?' ▼':' ▲'):''}</th>`).join('');
+
+  const tb=document.getElementById('tb');
+  if(!rows.length){tb.innerHTML=`<tr><td class="empty" colspan="${COLS.length}">لا توجد سجلات لهذا الاختيار</td></tr>`;return;}
+  tb.innerHTML=rows.map(r=>`<tr class="${r.isAbsent?'absent':''}">
+    <td class="first">${r.riderId}${r.sub?`<i class="${r.isNew?'new':''}">${r.sub}</i>`:''}</td>
+    <td>${r.contract}</td><td>${r.martName}</td>
+    <td class="num">${r.shifts}</td>
+    <td class="num">${r.isAbsent?'غائب':r.actualHours}</td>
+    <td class="num">${r.avgHoursPerDay}</td>
+    <td class="num hl">${r.orders}</td>
+    <td class="num">${r.avgOrdersPerDay}</td>
+    <td class="num hl">${r.utr}</td>
+    <td class="num ${r.delays>0?'dl':''}">${r.delays}</td></tr>`).join('');
+}
+</script>
+</body>
+</html>
