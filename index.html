@@ -101,6 +101,16 @@ tr[data-id]:active td{filter:brightness(.96)}
 .dt td,.dt th{padding:10px 6px;text-align:right;background:transparent;position:static;border-bottom:1px solid #eef0ec;cursor:default;font-size:13px;font-weight:600}
 .dt th{color:var(--mut);font-size:12px;background:transparent}
 .dt tr.absent td{background:var(--bad);color:var(--badtx)}
+.kpi .dl2{display:inline-block;font-size:12px;font-weight:800}
+.dt td.n{font-variant-numeric:tabular-nums}
+.dt small{display:block;color:var(--mut);font-size:11px;font-weight:600}
+.dt tr.fd td{color:#9aa3ad}
+.dt tr.fd small{color:#b4bbc3}
+.dt tr.tot td{font-weight:800;background:#f3f5f1;border-top:2px solid var(--line)}
+main{max-width:960px;margin:0 auto;width:100%}
+.bar{padding-left:max(12px,calc((100% - 936px)/2));padding-right:max(12px,calc((100% - 936px)/2))}
+.sheet>*{max-width:720px;margin-left:auto;margin-right:auto}
+@media(min-width:720px){.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}.tw{max-height:72dvh}}
 </style>
 </head>
 <body>
@@ -445,7 +455,7 @@ const fmt=x=>(Math.round(x*10)/10).toLocaleString();
 function delta(diff,pct,digits){
   if(Math.abs(diff)<0.05)return '<span class="dl2 flat">—</span>';
   const cls=diff>0?'up':'down', ar=diff>0?'▲':'▼';
-  const v=pct?Math.abs(Math.round(diff))+'%':(Math.round(Math.abs(diff)*Math.pow(10,digits))/Math.pow(10,digits));
+  const v=pct?(Math.round(Math.abs(diff)*10)/10)+'%':(Math.round(Math.abs(diff)*Math.pow(10,digits))/Math.pow(10,digits));
   return `<span class="dl2 ${cls}">${ar} ${v}</span>`;
 }
 function openFromRow(e){
@@ -517,11 +527,12 @@ function renderCmp(){
   const el=$('cmp');
   if(mondays.length<2){el.innerHTML='<div class="card empty">المقارنة تحتاج بيانات أسبوعين على الأقل</div>';return;}
   const cur=mondays[0], prev=mondays[1];
-  const n=Math.max(...dates.filter(d=>mondayOf(d)===cur).map(dowOf))+1;
+  const days=[0,1,2,3,4,5,6].filter(i=>dates.includes(addDays(cur,i)));
+  const set=new Set(days);
   const ok=r=>state.mart==='all'||r.martCode===state.mart;
   const curAll=records.filter(r=>r.monday===cur&&ok(r));
   const prevAll=records.filter(r=>r.monday===prev&&ok(r));
-  const A=curAll, B=prevAll.filter(r=>r.dow<n);
+  const A=curAll, B=prevAll.filter(r=>set.has(r.dow));
   const sa=stats(A), sb=stats(B);
   const pct=(a,b)=>b?((a-b)/b*100):0;
   const card=(l,v,d,df)=>`<div class="kpi ${Math.abs(df)<0.05?'':(df>0?'gk':'rk')}"><span>${l}</span><b>${v}</b>${d}</div>`;
@@ -533,21 +544,34 @@ function renderCmp(){
   const oc=Array(7).fill(0), op=Array(7).fill(0);
   curAll.forEach(r=>oc[r.dow]+=r.orders);
   prevAll.forEach(r=>op[r.dow]+=r.orders);
-  const mx=Math.max(1,...oc,...op);
-  const bars=DAYS.map((d,i)=>`<div class="bc"><div class="pair"><i style="height:${Math.round(oc[i]/mx*84)}px;background:${oc[i]>=op[i]?'#16a34a':'#dc2626'}"></i><i style="height:${Math.round(op[i]/mx*84)}px;background:#c5cbc2"></i></div><div class="bl">${d}</div></div>`).join('');
+  const chg=(a,b)=>{
+    const d=a-b;
+    if(Math.abs(d)<0.5)return '<span class="dl2 flat">—</span>';
+    const p=b?Math.abs(d/b*100).toFixed(1)+'%':'';
+    return `<span class="dl2 ${d>0?'up':'down'}">${d>0?'▲':'▼'} ${Math.abs(Math.round(d)).toLocaleString()}${p?' · '+p:''}</span>`;
+  };
+  const n0=x=>Math.round(x).toLocaleString();
+  let rows='', ta=0, tb=0;
+  for(let i=0;i<7;i++){
+    const has=set.has(i);
+    if(has){ta+=oc[i];tb+=op[i];}
+    rows+=`<tr class="${has?'':'fd'}"><td>${weekdayLabel(addDays(cur,i))}<small>السابق ${addDays(prev,i).slice(5)}</small></td><td class="n">${has?n0(oc[i]):'—'}</td><td class="n">${n0(op[i])}</td><td>${has?chg(oc[i],op[i]):''}</td></tr>`;
+  }
+  rows+=`<tr class="tot"><td>الإجمالي</td><td class="n">${n0(ta)}</td><td class="n">${n0(tb)}</td><td>${chg(ta,tb)}</td></tr>`;
   const m=new Map();
   const add=(rs,k)=>rs.forEach(r=>{if(!m.has(r.riderId))m.set(r.riderId,{o:{a:0,b:0},h:{a:0,b:0}});const x=m.get(r.riderId);x.o[k]+=r.orders;x.h[k]+=r.actualHours;});
   add(A,'a');add(B,'b');
   const mv=[];
   m.forEach((x,id)=>{if(x.h.a>=5&&x.h.b>=5){const ua=x.o.a/x.h.a,ub=x.o.b/x.h.b;mv.push({id,ua,ub,d:ua-ub});}});
   mv.sort((p,q)=>q.d-p.d);
-  const row=x=>`<div class="mv ${x.d>0?'gk':'rk'}" data-id="${esc(x.id)}"><span>${x.id}<br><small>${x.ub.toFixed(2)} ← ${x.ua.toFixed(2)}</small></span><span class="dl2 ${x.d>0?'up':'down'}">${x.d>0?'▲':'▼'} ${Math.abs(x.d).toFixed(2)}</span></div>`;
+  const row=x=>`<div class="mv ${x.d>0?'gk':'rk'}" data-id="${esc(x.id)}"><span>${x.id}<br><small>الآن ${x.ua.toFixed(2)} · السابق ${x.ub.toFixed(2)}</small></span><span class="dl2 ${x.d>0?'up':'down'}">${x.d>0?'▲':'▼'} ${Math.abs(x.d).toFixed(2)}</span></div>`;
   const up=mv.filter(x=>x.d>0).slice(0,5), down=mv.filter(x=>x.d<0).slice(-5).reverse();
   el.innerHTML=`
-    <p class="note">مقارنة أول ${n} ${n===1?'يوم':'أيام'} من كل أسبوع (من ${cur} ومن ${prev}) حتى تكون المقارنة عادلة.</p>
+    <p class="note">المقارنة بين الأسبوع الذي يبدأ ${cur} والأسبوع الذي يبدأ ${prev}، وتشمل الأيام المكتملة فقط (${days.length} ${days.length===1?'يوم':'أيام'}) حتى تكون عادلة.</p>
     <div class="kpis">${cards}</div>
-    <div class="card"><h3>الطلبات بالأيام</h3><div class="chart">${bars}</div>
-      <div class="lg"><span><b style="background:#16a34a"></b>أعلى من السابق</span><span><b style="background:#dc2626"></b>أقل من السابق</span><span><b style="background:#c5cbc2"></b>الأسبوع السابق</span></div></div>
+    <div class="card"><h3>الطلبات يوماً بيوم</h3>
+      <table class="dt"><tr><th>اليوم</th><th>هذا الأسبوع</th><th>السابق</th><th>التغيير</th></tr>${rows}</table>
+      <p class="note" style="margin-top:8px">الأيام الباهتة لم تكتمل بعد هذا الأسبوع، وأرقام الأسبوع السابق لها للمعلومة فقط.</p></div>
     <div class="card"><h3>الأكثر تحسناً في UTR</h3>${up.length?up.map(row).join(''):'<p class="note">لا يوجد</p>'}</div>
     <div class="card"><h3>الأكثر تراجعاً في UTR</h3>${down.length?down.map(row).join(''):'<p class="note">لا يوجد</p>'}
       <p class="note" style="margin-top:8px">يشمل المناديب الذين عملوا 5 ساعات على الأقل في كل أسبوع.</p></div>`;
