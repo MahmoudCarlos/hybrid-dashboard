@@ -1,0 +1,41 @@
+name: Daily Fleet Data Auto-Update
+
+on:
+  schedule:
+    # يعمل يومياً الساعة 1:15 ظهراً بتوقيت القاهرة (11:15 UTC)
+    - cron: '15 11 * * *'
+  # إمكانية تشغيله يدوياً في أي وقت بضغطة زر للتجربة
+  workflow_dispatch:
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: جلب كود المشروع
+        uses: actions/checkout@v4
+
+      - name: إعداد بيئة بايثون
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: تثبيت المكتبات المطلوبة
+        run: |
+          pip install gspread google-auth pandas
+
+      - name: تشغيل سكربت سحب الشيت
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+        run: |
+          python fetch_data.py
+
+      - name: حفظ ورفع الملف الجديد على جيت هب
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add data.csv.csv
+          git diff --quiet && git diff --staged --quiet || (git commit -m "تحديث تلقائي للبيانات اليومية" && git push)
