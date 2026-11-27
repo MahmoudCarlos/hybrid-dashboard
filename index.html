@@ -181,7 +181,7 @@ main{max-width:960px;margin:0 auto;width:100%}
 
 <script>
 const MARTS = {
-  '10223':{name:'شروق 1',zone:'shorouk'},'10187':{name:'شروق 3',zone:'shorouk'},'10233':{name:'شروق حي 8',zone:'shorouk'},
+  '10223':{name:'شروق 1',zone:'shorouk'},'10187':{name:'شروق 3',zone:'shorouk'},'10233':{name:'شروق حي 8',zone:'shorouk'},'10281':{name:'شروق 4',zone:'shorouk'},
   '10177':{name:'عبور',zone:'obour'},'10207':{name:'عبور صناعية',zone:'obour'},'10260':{name:'عبور جولف',zone:'obour'}
 };
 const COLS = [
@@ -315,7 +315,7 @@ function process(rows){
   records=records.filter(r=>r.date&&!partial.includes(r.date));
   dates=[...new Set(records.map(r=>r.date))].sort(); latest=dates[dates.length-1]||'';
   mondays=[...new Set(dates.map(mondayOf))].sort().reverse();
-  state.period='latest'; state.day=null;
+  state.period='latest'; state.day=null; applyHash();
   setStatus(latest?('بيانات يوم '+latest):'لا توجد بيانات');
   showMsg(!records.length?'تم قراءة الملف لكن بدون سجلات صالحة. تأكد من صف العناوين.':(partial.length?('ملاحظة: يوم '+partial.join('، ')+' غير مكتمل في الملف (لا توجد طلبات وساعات العمل قليلة جداً) فلم يُحتسب. أحدث يوم مكتمل هو '+latest+'.'):''));
   render();
@@ -324,7 +324,15 @@ function process(rows){
 /* ---------- state setters ---------- */
 function setPeriod(p){state.period=p;state.day=null;render();}
 function setDay(d){state.day=d;render();}
-function setMart(m){state.mart=m;render();}
+function applyHash(){ // رابط مباشر لمارت: ...#mart=10281
+  const m=(location.hash.match(/mart=(\d+)/)||[])[1];
+  if(m&&MARTS[m])state.mart=m;
+}
+function setMart(m){
+  state.mart=m;
+  try{history.replaceState(history.state,'',m==='all'?location.pathname+location.search:'#mart='+m);}catch(e){}
+  render();
+}
 function setView(v){state.view=v;render();}
 function sortBy(k){
   if(state.sort===k)state.dir=state.dir==='desc'?'asc':'desc';
